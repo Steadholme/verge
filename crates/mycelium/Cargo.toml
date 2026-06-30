@@ -1,0 +1,53 @@
+[package]
+name = "mycelium"
+version = "0.1.0"
+edition = "2021"
+description = "Mycelium — zero-trust WireGuard mesh control plane (enrollment, peers, ACLs, config generation) for the HOLDFAST stack."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "mycelium"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mycelium"
+path = "src/main.rs"
+
+[dependencies]
+# HTTP framework (shared with keystone/keyward/inkwell): Form/State/Path extractors, typed responses.
+axum = "0.8"
+# Async runtime axum runs on. The Store trait is async: handlers `.await` it directly and
+# PgStore drives sqlx natively, so a worker thread is NEVER blocked (no sync-over-async bridge).
+# `sync` brings in the tokio Mutex that serializes IP allocation during enroll.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+# Erase the async Store trait methods so `Arc<dyn Store>` stays object-safe (handlers depend
+# only on the trait, exactly like the keystone/keyward/inkwell seam).
+async-trait = "0.1"
+# Deserialize the urlencoded enroll / revoke / add-ACL form bodies.
+serde = { version = "1", features = ["derive"] }
+# Serialize audit events to JSON for the Watchtower emitter.
+serde_json = "1"
+# Ergonomic error/store enums -> branded error page / HTTP status.
+thiserror = "2"
+# Structured logging.
+tracing = "0.1"
+tracing-subscriber = "0.3"
+# Epoch -> UTC date components for the "last seen" / "enrolled" columns (std only, no C deps).
+time = { version = "0.3", default-features = false, features = ["std"] }
+# CSPRNG bytes for the WireGuard private key + the double-submit CSRF token. A tiny libc-backed
+# shim (no rand_chacha tree).
+getrandom = "0.2"
+# Pure-Rust Curve25519: derive the WireGuard public key from a clamped private scalar. `ring`/
+# `dalek` only — NO OpenSSL. We use the low-level `x25519` function + basepoint constant, so no
+# extra features beyond the defaults are needed.
+x25519-dalek = "2"
+# Standard base64 for the WireGuard key encoding (`wg`-compatible: 32 bytes -> 44 chars).
+base64 = "0.22"
+# Portable PostgreSQL data layer. Runtime queries only (sqlx::query/Row) — NO compile-time
+# macros, so the build needs NO database. rustls TLS (no openssl). Standard SQL only, so the
+# same statements later run unchanged on FusionDB over pgwire.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres"] }
+
+[dev-dependencies]
+# ServiceExt::oneshot drives the Router in-process for the end-to-end tests (no port bind).
+tower = { version = "0.5", features = ["util"] }

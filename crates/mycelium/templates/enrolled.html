@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Device enrolled · Mycelium</title>
+  <style>{{CSS}}</style>
+</head>
+<body class="page-console">
+{{TOPBAR}}
+<main class="console console--narrow">
+  <a class="back-link" href="/">&larr; Back to the mesh</a>
+  <div class="console__head">
+    <h1>Device enrolled</h1>
+    <p class="sub">Copy this configuration to the device now. The <strong>private key is shown only once</strong> and is never stored on the server.</p>
+  </div>
+
+  <section class="summary summary--inline">
+    <div class="summary__item"><span class="summary__label">Name</span><span class="summary__value">{{NAME}}</span></div>
+    <div class="summary__item"><span class="summary__label">Mesh IP</span><span class="summary__value mono">{{MESH_IP}}</span></div>
+    <div class="summary__item"><span class="summary__label">Peers</span><span class="summary__value">{{PEER_COUNT}}</span></div>
+  </section>
+
+  <div class="reveal-banner">
+    <strong>One-time secret.</strong> This config contains the device's private key. If you lose it, revoke the device and enroll again — the key cannot be recovered.
+  </div>
+
+  <section class="card">
+    <div class="card__head"><h2>wg0.conf</h2></div>
+    <div class="card__body">
+      <pre class="conf"><code>{{CONF}}</code></pre>
+    </div>
+  </section>
+
+  <p class="note">Public key: <code class="mono">{{PUBKEY}}</code>. You can re-download this device's peer list later (without the private key) from the <a href="/">dashboard</a>.</p>
+</main>
+</body>
+</html>

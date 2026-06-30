@@ -1,0 +1,58 @@
+[package]
+name = "eddy"
+version = "0.1.0"
+edition = "2021"
+description = "Eddy — sovereign static-asset edge cache / mini-CDN for the HOLDFAST stack (content-addressed, signed, exactly invalidated)."
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "eddy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "eddy"
+path = "src/main.rs"
+
+[dependencies]
+# HTTP framework (shared with the rest of the estate): State/Path/Query/Form/Multipart extractors,
+# server-rendered HTML for the SSO console, raw byte responses for the public `/a/` edge. `multipart`
+# enables the streaming file-upload form on `POST /api/assets`.
+axum = { version = "0.8", features = ["multipart"] }
+# Async runtime axum runs on. The Store + Blobs traits are async: handlers `.await` them directly and
+# PgStore/FsBlobs drive sqlx/tokio::fs natively, so a worker thread is NEVER blocked (no
+# sync-over-async bridge). `fs`/`net`/`io-util` back the filesystem blob store + the audit emitter's
+# hand-rolled HTTP client; `rt-multi-thread` keeps the serving runtime parallel for concurrent reads.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "fs", "net", "io-util"] }
+# Erase the async Store/Blobs trait methods so `Arc<dyn _>` stays object-safe (the same seam as the
+# rest of the estate).
+async-trait = "0.1"
+# Deserialize the JSON/urlencoded `{origin_url}` body + the console form bodies; serialize audit events.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_urlencoded = "0.7"
+# Ergonomic error/store enums -> HTML page (console) / status code (edge).
+thiserror = "2"
+# Structured logging.
+tracing = "0.1"
+tracing-subscriber = "0.3"
+# Epoch -> UTC components for the console timestamps (std only — no extra C deps). Same crate the rest
+# of the estate pins.
+time = { version = "0.3", default-features = false, features = ["std"] }
+# CSPRNG (OsRng) for ids + the double-submit CSRF token. rand 0.8 matches the relay/aperture OsRng path.
+rand = "0.8"
+# Content addressing (sha256 over the asset bytes) + HMAC-signed `/a/` URLs. RustCrypto — pure Rust,
+# NO OpenSSL. `hex` renders the digest + signature.
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+# Origin fetch for `POST /api/assets {origin_url}`. rustls (NO OpenSSL); default-features off so no
+# native-tls/openssl is dragged in — the binary stays glibc-only, matching the estate posture.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Portable PostgreSQL data layer. Runtime queries only (sqlx::query/Row) — NO compile-time macros, so
+# the build needs NO database. rustls TLS (no openssl). Standard SQL only, so the same statements
+# later run unchanged on FusionDB over pgwire.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres"] }
+
+[dev-dependencies]
+# ServiceExt::oneshot drives the Router in-process for the end-to-end tests (no port bind).
+tower = { version = "0.5", features = ["util"] }

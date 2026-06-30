@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Mycelium · HOLDFAST</title>
+  <style>{{CSS}}</style>
+</head>
+<body class="page-console">
+{{TOPBAR}}
+<main class="console console--wide">
+  <div class="console__head">
+    <h1>Mesh control plane</h1>
+    <p class="sub">Enroll devices, manage peers + ACLs, and generate WireGuard configs. This is the coordination server — it does not run a kernel tunnel on this host.</p>
+  </div>
+
+  <section class="summary">
+    <div class="summary__item"><span class="summary__label">Mesh CIDR</span><span class="summary__value mono">{{CIDR}}</span></div>
+    <div class="summary__item"><span class="summary__label">Gateway / DNS</span><span class="summary__value mono">{{GATEWAY}} · {{DNS}}</span></div>
+    <div class="summary__item"><span class="summary__label">Devices (active/total)</span><span class="summary__value">{{DEVICE_COUNT}}</span></div>
+    <div class="summary__item"><span class="summary__label">Endpoint domain</span><span class="summary__value mono">{{ENDPOINT_DOMAIN}}</span></div>
+    <div class="summary__item"><span class="summary__label">ACL rules</span><span class="summary__value">{{ACL_COUNT}}</span></div>
+    <div class="summary__item"><span class="summary__label">Trust posture</span><span class="summary__value">{{POSTURE}}</span></div>
+  </section>
+
+  <section class="card">
+    <div class="card__head">
+      <h2>Devices</h2>
+    </div>
+    <div class="card__body card__body--flush">
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th>Name</th><th>Mesh IP</th><th>Public key</th><th>Tags</th><th>Last seen</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{DEVICE_ROWS}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__head"><h2>Enroll a device</h2></div>
+    <div class="card__body">
+      <form class="grid-form" method="post" action="/api/devices">
+        <input type="hidden" name="csrf_token" value="{{CSRF}}">
+        <div class="field">
+          <label for="name">Device name</label>
+          <input type="text" id="name" name="name" required maxlength="120" placeholder="e.g. alice-laptop">
+        </div>
+        <div class="field">
+          <label for="tags">Tags <span class="muted">(comma or space separated, optional)</span></label>
+          <input type="text" id="tags" name="tags" maxlength="200" placeholder="e.g. web prod">
+        </div>
+        <div class="field field--submit">
+          <button class="btn btn-primary" type="submit">Generate keys &amp; enroll</button>
+        </div>
+      </form>
+      <p class="note">The server generates a Curve25519 keypair and assigns the next free mesh IP. The private key is shown <strong>once</strong> on the next screen and never stored.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__head"><h2>Access control</h2></div>
+    <div class="card__body card__body--flush">
+      <table class="dtable">
+        <thead><tr><th>Source tag</th><th>Destination tag</th><th>Ports</th></tr></thead>
+        <tbody>
+          {{ACL_ROWS}}
+        </tbody>
+      </table>
+    </div>
+    <div class="card__body">
+      <form class="grid-form" method="post" action="/api/acls">
+        <input type="hidden" name="csrf_token" value="{{CSRF}}">
+        <div class="field">
+          <label for="src_tag">Source tag</label>
+          <input type="text" id="src_tag" name="src_tag" maxlength="64" placeholder="* or web">
+        </div>
+        <div class="field">
+          <label for="dst_tag">Destination tag</label>
+          <input type="text" id="dst_tag" name="dst_tag" maxlength="64" placeholder="* or db">
+        </div>
+        <div class="field">
+          <label for="ports">Ports</label>
+          <input type="text" id="ports" name="ports" maxlength="64" placeholder="* or 443">
+        </div>
+        <div class="field field--submit">
+          <button class="btn btn-secondary" type="submit">Add rule</button>
+        </div>
+      </form>
+      <p class="note">A tag of <code>*</code> matches any device. With <strong>no</strong> rules the mesh is full-allow; adding the first rule switches it to default-deny (only matched links are configured as peers).</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

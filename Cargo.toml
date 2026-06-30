@@ -1,0 +1,32 @@
+[package]
+name = "verge"
+version = "0.1.0"
+edition = "2021"
+description = "Verge — one deployable hosting the HOLDFAST edge surfaces (static edge cache / WireGuard mesh control plane) behind a Host-based vhost demux on a DUAL listener (:9220 + :9290). Each surface keeps its own database, routes, subdomain and port; this binary just composes the two library crates so the estate runs one container instead of two."
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "verge"
+path = "src/main.rs"
+
+[dependencies]
+# The two edge surfaces, vendored as path-dep library crates and reused VERBATIM (their code,
+# schemas, routes, templates and tests are unchanged except the mycelium DB-source env fix). Verge
+# only adds the vhost demux + the second listener, so each surface behaves exactly as its standalone
+# service did — Eddy still owns its asset DB at EDDY_DATABASE_URL + its blob volume, and Mycelium its
+# mesh-control DB at MYCELIUM_DATABASE_URL.
+eddy = { path = "crates/eddy" }
+mycelium = { path = "crates/mycelium" }
+
+# HTTP framework — the outer Host-demux router + the per-surface routers returned by each crate's
+# `app()`. Same axum the surfaces use.
+axum = "0.8"
+# Async runtime: connect/migrate the two Postgres stores at startup, open the eddy blob backend,
+# then serve the SAME demux router on two listeners concurrently. `net` backs the dependency-free
+# `healthcheck` subcommand's loopback probe.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "net", "io-util"] }
+# `ServiceExt::oneshot` drives the chosen per-surface Router for one request inside the demux.
+tower = { version = "0.5", features = ["util"] }
+# Structured logging (shared with the surfaces).
+tracing = "0.1"
+tracing-subscriber = "0.3"
