@@ -185,9 +185,23 @@ pub fn link_allowed(acls: &[(String, String)], src_tags: &[String], dst_tags: &[
         .any(|(src, dst)| tag_matches(src, src_tags) && tag_matches(dst, dst_tags))
 }
 
-/// Render a `wg.conf`. `private_key` is `Some` only on the one-time enrollment render; the
-/// re-issued config (GET /api/config/{id}) passes `None`, so the secret never leaves twice.
-pub fn render_conf(private_key: Option<&str>, address: &str, dns: &str, peers: &[PeerView]) -> String {
+/// The single hub `[Peer]` a spoke client dials in a hub-and-spoke topology. The estate runs a
+/// real hub-and-spoke WireGuard (host `wg0` gateway), so a client conf lists ONLY the hub — the
+/// server side (per-spoke peers) is reconciled on the host, not shipped in the client conf.
+#[derive(Clone, Debug)]
+pub struct HubPeer {
+    /// The hub's base64 WireGuard public key.
+    pub public_key: String,
+    /// The hub `Endpoint`, e.g. `vpn.w33d.xyz:51820`.
+    pub endpoint: String,
+    /// The routes a spoke sends through the hub, e.g. `10.77.0.0/24` (the whole mesh).
+    pub allowed_ips: String,
+}
+
+/// Render a hub-and-spoke `wg.conf`: an `[Interface]` plus the single hub `[Peer]`. `private_key`
+/// is `Some` only on the one-time enrollment render; the re-issued config (GET /api/config/{id})
+/// passes `None`, so the secret never leaves twice.
+pub fn render_conf(private_key: Option<&str>, address: &str, dns: &str, hub: &HubPeer) -> String {
     let mut out = String::new();
     out.push_str("[Interface]\n");
     match private_key {
@@ -199,17 +213,13 @@ pub fn render_conf(private_key: Option<&str>, address: &str, dns: &str, peers: &
     out.push_str(&format!("Address = {address}/32\n"));
     out.push_str(&format!("DNS = {dns}\n"));
 
-    for p in peers {
-        out.push('\n');
-        out.push_str(&format!("# {}\n", sanitize_comment(&p.name)));
-        out.push_str("[Peer]\n");
-        out.push_str(&format!("PublicKey = {}\n", p.public_key));
-        out.push_str(&format!("AllowedIPs = {}/32\n", p.mesh_ip));
-        if let Some(ep) = &p.endpoint {
-            out.push_str(&format!("Endpoint = {ep}\n"));
-        }
-        out.push_str("PersistentKeepalive = 25\n");
-    }
+    out.push('\n');
+    out.push_str("# hub — HOLDFAST WireGuard gateway (hub-and-spoke)\n");
+    out.push_str("[Peer]\n");
+    out.push_str(&format!("PublicKey = {}\n", hub.public_key));
+    out.push_str(&format!("Endpoint = {}\n", hub.endpoint));
+    out.push_str(&format!("AllowedIPs = {}\n", hub.allowed_ips));
+    out.push_str("PersistentKeepalive = 25\n");
     out
 }
 
@@ -243,11 +253,6 @@ pub fn slugify(name: &str) -> String {
     } else {
         trimmed
     }
-}
-
-/// Strip newlines from a name before it becomes a `# comment` line in the conf.
-fn sanitize_comment(s: &str) -> String {
-    s.replace(['\n', '\r'], " ")
 }
 
 /// Parse a free-form tag string (comma- and/or whitespace-separated) into a normalized, deduped
@@ -348,23 +353,24 @@ mod tests {
     }
 
     #[test]
-    fn conf_render_includes_and_omits_private_key() {
-        let peers = vec![PeerView {
-            name: "laptop".to_string(),
-            public_key: "PUBKEYAAAA".to_string(),
-            mesh_ip: "10.77.0.3".to_string(),
-            endpoint: Some("laptop.mesh.w33d.xyz:51820".to_string()),
-        }];
-        let with = render_conf(Some("PRIVKEY"), "10.77.0.2", "10.77.0.1", &peers);
+    fn conf_render_is_hub_and_spoke() {
+        let hub = HubPeer {
+            public_key: "HUBPUBKEYAAAA".to_string(),
+            endpoint: "vpn.w33d.xyz:51820".to_string(),
+            allowed_ips: "10.77.0.0/24".to_string(),
+        };
+        let with = render_conf(Some("PRIVKEY"), "10.77.0.2", "10.77.0.1", &hub);
         assert!(with.contains("PrivateKey = PRIVKEY"));
         assert!(with.contains("Address = 10.77.0.2/32"));
         assert!(with.contains("DNS = 10.77.0.1"));
-        assert!(with.contains("PublicKey = PUBKEYAAAA"));
-        assert!(with.contains("AllowedIPs = 10.77.0.3/32"));
-        assert!(with.contains("Endpoint = laptop.mesh.w33d.xyz:51820"));
+        // Exactly one peer — the hub — and no per-spoke /32 peer lines.
+        assert_eq!(with.matches("[Peer]").count(), 1, "single hub peer only");
+        assert!(with.contains("PublicKey = HUBPUBKEYAAAA"));
+        assert!(with.contains("Endpoint = vpn.w33d.xyz:51820"));
+        assert!(with.contains("AllowedIPs = 10.77.0.0/24"));
         assert!(with.contains("PersistentKeepalive = 25"));
 
-        let without = render_conf(None, "10.77.0.2", "10.77.0.1", &peers);
+        let without = render_conf(None, "10.77.0.2", "10.77.0.1", &hub);
         assert!(!without.contains("PrivateKey = PRIVKEY"));
         assert!(without.contains("# PrivateKey ="));
     }

@@ -163,13 +163,20 @@ pub async fn enroll(
     state.store.create_device(&device, &tags).await?;
     drop(guard);
 
-    // Build the new device's conf (peers = all other enabled devices it may reach per ACLs).
+    // The client conf is hub-and-spoke: [Interface] + the single hub [Peer]. The full-mesh peer
+    // list is NOT shipped to the client (the host reconciler manages server-side peers). We still
+    // compute the reachable-peer count under the ACLs for the operator's confirmation page.
     let mut all = existing;
     all.push(device.clone());
     let tmap = store::tag_map(state.store.all_tags().await);
     let acl_pairs = acl_pairs(&state).await;
     let peers = compute_peers(&device, &all, &tmap, &acl_pairs, &state.config);
-    let conf = wg::render_conf(Some(&keypair.private_b64), &device.mesh_ip, &state.config.dns, &peers);
+    let conf = wg::render_conf(
+        Some(&keypair.private_b64),
+        &device.mesh_ip,
+        &state.config.dns,
+        &state.config.hub_peer(),
+    );
 
     // Audit records WHO enrolled WHICH device WHERE — never the private key.
     state.audit.emit(AuditEvent::info(
@@ -260,9 +267,9 @@ pub async fn add_acl(
 // Config re-render
 // ---------------------------------------------------------------------------
 
-/// `GET /api/config/{id}` — re-render a device's `wg.conf` WITHOUT the private key (peers only),
-/// served as a downloadable text file. Lets an operator refresh a device's peer list after the
-/// mesh or ACLs change, without ever re-exposing key material.
+/// `GET /api/config/{id}` — re-render a device's hub-and-spoke `wg.conf` WITHOUT the private key,
+/// served as a downloadable text file. Lets an operator re-fetch a device's config (hub `[Peer]`)
+/// without ever re-exposing key material.
 pub async fn config(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -276,11 +283,8 @@ pub async fn config(
         .await
         .ok_or_else(|| AppError::NotFound("no such device".to_string()))?;
 
-    let all = state.store.list_devices().await;
-    let tmap = store::tag_map(state.store.all_tags().await);
-    let acl_pairs = acl_pairs(&state).await;
-    let peers = compute_peers(&device, &all, &tmap, &acl_pairs, &state.config);
-    let conf = wg::render_conf(None, &device.mesh_ip, &state.config.dns, &peers);
+    // Re-render is hub-and-spoke too: [Interface] (no private key) + the single hub [Peer].
+    let conf = wg::render_conf(None, &device.mesh_ip, &state.config.dns, &state.config.hub_peer());
 
     let filename = format!("{}.conf", wg::slugify(&device.name));
     let mut resp = (StatusCode::OK, conf).into_response();

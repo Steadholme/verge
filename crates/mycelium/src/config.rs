@@ -18,6 +18,15 @@ pub const DEFAULT_LISTEN_PORT: u16 = 51820;
 /// Hard cap on how many devices the dashboard renders (keeps an unbounded list bounded).
 pub const LIST_LIMIT: usize = 500;
 
+/// Default HUB `Endpoint` a spoke client dials (`HUB_ENDPOINT`). The estate runs a real
+/// hub-and-spoke WireGuard: every generated client config points at this single gateway.
+pub const DEFAULT_HUB_ENDPOINT: &str = "vpn.w33d.xyz:51820";
+/// Default `AllowedIPs` a spoke routes through the hub (`HUB_ALLOWED_IPS`): the whole mesh.
+pub const DEFAULT_HUB_ALLOWED_IPS: &str = "10.77.0.0/24";
+/// Dev-only placeholder hub public key. NOT a real key — the production hub key is injected via
+/// `HUB_PUBKEY` (never hardcoded). Keeps the no-config dev/test path rendering a valid `[Peer]`.
+pub const DEV_HUB_PUBKEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
 /// Runtime configuration. Cheap to clone; shared read-only behind `Arc`.
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -29,9 +38,18 @@ pub struct Config {
     /// CIDR's first usable host (the gateway slot).
     pub dns: String,
     /// Hostname suffix for peer `Endpoint` lines (`MESH_ENDPOINT_DOMAIN`). Empty => no `Endpoint`.
+    /// Retained for the ACL/reachability model + dashboard; irrelevant to the hub-and-spoke
+    /// CLIENT conf, which always dials the single hub below.
     pub endpoint_domain: String,
     /// WireGuard listen port baked into peer `Endpoint`s (`MESH_LISTEN_PORT`).
     pub listen_port: u16,
+    /// The hub's WireGuard public key (`HUB_PUBKEY`). Rendered as the single `[Peer]` in every
+    /// client conf. NEVER hardcoded to the real key — dev/test uses [`DEV_HUB_PUBKEY`].
+    pub hub_pubkey: String,
+    /// The hub `Endpoint` a spoke dials (`HUB_ENDPOINT`), e.g. `vpn.w33d.xyz:51820`.
+    pub hub_endpoint: String,
+    /// The `AllowedIPs` a spoke routes through the hub (`HUB_ALLOWED_IPS`), e.g. `10.77.0.0/24`.
+    pub hub_allowed_ips: String,
 }
 
 impl Config {
@@ -45,6 +63,18 @@ impl Config {
             dns,
             endpoint_domain: DEFAULT_ENDPOINT_DOMAIN.to_string(),
             listen_port: DEFAULT_LISTEN_PORT,
+            hub_pubkey: DEV_HUB_PUBKEY.to_string(),
+            hub_endpoint: DEFAULT_HUB_ENDPOINT.to_string(),
+            hub_allowed_ips: DEFAULT_HUB_ALLOWED_IPS.to_string(),
+        }
+    }
+
+    /// The single hub `[Peer]` every spoke client dials (hub-and-spoke topology).
+    pub fn hub_peer(&self) -> crate::wg::HubPeer {
+        crate::wg::HubPeer {
+            public_key: self.hub_pubkey.clone(),
+            endpoint: self.hub_endpoint.clone(),
+            allowed_ips: self.hub_allowed_ips.clone(),
         }
     }
 
@@ -76,6 +106,20 @@ impl Config {
                 Ok(p) if p > 0 => config.listen_port = p,
                 _ => tracing::warn!(port = %v, "invalid MESH_LISTEN_PORT — keeping default"),
             }
+        }
+        // Hub-and-spoke: the single gateway every client conf points at. HUB_PUBKEY must be set in
+        // production (the dev placeholder is not a real key); HUB_DNS overrides the client DNS.
+        if let Some(v) = env_nonempty("HUB_PUBKEY") {
+            config.hub_pubkey = v.trim().to_string();
+        }
+        if let Some(v) = env_nonempty("HUB_ENDPOINT") {
+            config.hub_endpoint = v.trim().to_string();
+        }
+        if let Some(v) = env_nonempty("HUB_DNS") {
+            config.dns = v.trim().to_string();
+        }
+        if let Some(v) = env_nonempty("HUB_ALLOWED_IPS") {
+            config.hub_allowed_ips = v.trim().to_string();
         }
         config
     }

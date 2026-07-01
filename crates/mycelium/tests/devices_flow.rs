@@ -2,7 +2,7 @@
 //!
 //! Drives the real `app` router via `tower::oneshot`, exactly like the rest of the estate.
 //! Covers: health, empty dashboard, the SSO/CSRF guards on enrollment, real enroll (server
-//! keygen + IP assignment + one-time conf), peer-list generation, the no-private-key re-render,
+//! keygen + IP assignment + one-time conf), hub-and-spoke conf generation, the no-private-key re-render,
 //! revoke, and ACL add (posture flip).
 
 use axum::body::Body;
@@ -57,10 +57,12 @@ async fn full_mesh_flow_in_memory() {
     let (status, body) = call(&state, post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf")))).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("Address = 10.77.0.3/32"), "second host is .3");
-    // With no ACLs yet (full mesh), db's conf lists alice as a peer.
-    assert!(body.contains("[Peer]"), "peer block present");
-    assert!(body.contains("AllowedIPs = 10.77.0.2/32"), "alice is a peer of db");
-    assert!(body.contains("Endpoint = alice-laptop.mesh.w33d.xyz:51820"), "peer endpoint derived");
+    // Hub-and-spoke: the client conf carries ONLY the hub peer, never a per-device mesh list.
+    assert!(body.contains("[Peer]"), "hub peer block present");
+    assert!(body.contains("Endpoint = vpn.w33d.xyz:51820"), "dials the hub endpoint");
+    assert!(body.contains("AllowedIPs = 10.77.0.0/24"), "routes the whole mesh via the hub");
+    assert!(body.contains("PersistentKeepalive = 25"), "keepalive for NAT traversal");
+    assert!(!body.contains("AllowedIPs = 10.77.0.2/32"), "no per-spoke /32 peer in client conf");
 
     // --- dashboard now lists both ------------------------------------------
     let (_, dash) = call(&state, get_auth("/", "u_admin", "admin@hf")).await;
@@ -72,7 +74,7 @@ async fn full_mesh_flow_in_memory() {
     assert!(dash.contains("2 / 2"), "device count summary");
 
     // --- re-render the first-listed device's config WITHOUT the private key.
-    // The dashboard lists newest-enrolled first, so this is `db` (10.77.0.3); its peer is alice.
+    // The dashboard lists newest-enrolled first, so this is `db` (10.77.0.3); its peer is the hub.
     let first_id = extract_first_device_id(&dash).expect("a device id in the dashboard");
     let (status, conf) =
         call(&state, get_auth(&format!("/api/config/{first_id}"), "u_admin", "admin@hf")).await;
@@ -80,7 +82,8 @@ async fn full_mesh_flow_in_memory() {
     assert!(conf.contains("# PrivateKey ="), "re-render omits the real private key");
     assert!(!conf.contains("\nPrivateKey ="), "no uncommented private key line on re-render");
     assert!(conf.contains("Address = 10.77.0.3/32"), "re-render keeps the device's own address");
-    assert!(conf.contains("AllowedIPs = 10.77.0.2/32"), "alice is a peer of db");
+    assert!(conf.contains("Endpoint = vpn.w33d.xyz:51820"), "re-render dials the hub");
+    assert!(conf.contains("AllowedIPs = 10.77.0.0/24"), "re-render routes the mesh via the hub");
 
     // --- config for an unknown device -> 404 -------------------------------
     let (status, _) = call(&state, get_auth("/api/config/dev_missing", "u_admin", "admin@hf")).await;
