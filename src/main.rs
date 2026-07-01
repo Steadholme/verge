@@ -11,8 +11,8 @@
 //! BEACON estate probes hit those ports directly (`eddy:9220` / `mycelium:9290`). To keep BOTH
 //! probes working unchanged, Verge binds the SAME demux router on BOTH ports: the host-agnostic
 //! top-level `GET /healthz` answers for every alias on either listener, and a caller reaching
-//! `mesh.w33d.xyz` (or the bare `mycelium`/`mesh` label) on either port is dispatched to Mycelium,
-//! `edge.w33d.xyz`/`eddy`/`edge` to Eddy.
+//! `mesh.w33d.xyz`/`vpn.w33d.xyz` (or the bare `mycelium`/`mesh` label) on either port is dispatched
+//! to Mycelium, `edge.w33d.xyz`/`eddy`/`edge` to Eddy.
 //!
 //! Mycelium is the WireGuard CONTROL PLANE only (enroll/peers/ACLs/config generation) — it brings
 //! up NO kernel tunnel on this host, so it is pure HTTP and safe to co-host behind the demux.
@@ -126,7 +126,10 @@ async fn dispatch(State(v): State<Vhosts>, req: Request) -> Response {
         .unwrap_or("");
     let router = match label {
         "edge" | "eddy" => v.edge,
-        "mesh" | "mycelium" => v.mesh,
+        // `vpn.w33d.xyz` is the operator-facing name for the WireGuard enrollment portal — the same
+        // Mycelium control plane served at `mesh.w33d.xyz` (the VPN hub UDP endpoint itself is
+        // `vpn.w33d.xyz:51820`, unrelated to this HTTP surface).
+        "mesh" | "mycelium" | "vpn" => v.mesh,
         _ => return (StatusCode::NOT_FOUND, "unknown edge host").into_response(),
     };
     // `Router` is a tower `Service` (the exact `app(state).oneshot(req)` path the surfaces' own
