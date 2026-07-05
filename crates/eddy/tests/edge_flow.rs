@@ -71,7 +71,12 @@ async fn body_bytes(resp: axum::response::Response) -> Vec<u8> {
 async fn healthz_is_ok() {
     let app = app(build_dev_state());
     let resp = app
-        .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/healthz")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -86,15 +91,29 @@ async fn upload_then_serve_with_validators_and_range() {
     // Upload via multipart.
     let resp = app
         .clone()
-        .oneshot(upload_request("css/app.css", "app.css", "text/css", content))
+        .oneshot(upload_request(
+            "css/app.css",
+            "app.css",
+            "text/css",
+            content,
+        ))
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "upload renders the dashboard");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "upload renders the dashboard"
+    );
 
     // Serve the cached asset.
     let resp = app
         .clone()
-        .oneshot(Request::builder().uri("/a/css/app.css").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/a/css/app.css")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -105,7 +124,10 @@ async fn upload_then_serve_with_validators_and_range() {
         .to_str()
         .unwrap()
         .to_string();
-    assert!(etag.starts_with('"') && etag.len() == 66, "strong sha256 ETag");
+    assert!(
+        etag.starts_with('"') && etag.len() == 66,
+        "strong sha256 ETag"
+    );
     assert_eq!(
         resp.headers().get(header::CONTENT_TYPE).unwrap(),
         "text/css; charset=utf-8"
@@ -156,7 +178,12 @@ async fn upload_then_serve_with_validators_and_range() {
 
     // Unknown path -> 404.
     let resp = app
-        .oneshot(Request::builder().uri("/a/missing.css").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/a/missing.css")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -173,7 +200,9 @@ async fn upload_without_csrf_is_rejected() {
             header::CONTENT_TYPE,
             format!("multipart/form-data; boundary={BOUNDARY}"),
         )
-        .body(Body::from(multipart_upload("x.css", "x.css", "text/css", b"a")))
+        .body(Body::from(multipart_upload(
+            "x.css", "x.css", "text/css", b"a",
+        )))
         .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
@@ -183,7 +212,12 @@ async fn upload_without_csrf_is_rejected() {
 async fn purge_by_path_removes_the_asset() {
     let app = app(build_dev_state());
     app.clone()
-        .oneshot(upload_request("logo.png", "logo.png", "image/png", b"\x89PNGxx"))
+        .oneshot(upload_request(
+            "logo.png",
+            "logo.png",
+            "image/png",
+            b"\x89PNGxx",
+        ))
         .await
         .unwrap();
 
@@ -205,7 +239,12 @@ async fn purge_by_path_removes_the_asset() {
 
     // Gone from the edge.
     let resp = app
-        .oneshot(Request::builder().uri("/a/logo.png").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/a/logo.png")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -219,14 +258,24 @@ async fn signed_url_is_required_when_key_set() {
 
     // Upload (signing does not affect the SSO management path).
     app.clone()
-        .oneshot(upload_request("js/app.js", "app.js", "text/javascript", b"console.log(1)"))
+        .oneshot(upload_request(
+            "js/app.js",
+            "app.js",
+            "text/javascript",
+            b"console.log(1)",
+        ))
         .await
         .unwrap();
 
     // No signature -> 403.
     let resp = app
         .clone()
-        .oneshot(Request::builder().uri("/a/js/app.js").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/a/js/app.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);

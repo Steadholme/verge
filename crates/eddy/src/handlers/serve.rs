@@ -62,9 +62,14 @@ pub async fn serve(
 
     // --- 3. conditional revalidation (If-None-Match) -----------------------
     if if_none_match_hit(&headers, &etag) {
-        return base_builder(StatusCode::NOT_MODIFIED, &asset.content_type, &etag, &cache_control)
-            .body(Body::empty())
-            .expect("valid 304 response");
+        return base_builder(
+            StatusCode::NOT_MODIFIED,
+            &asset.content_type,
+            &etag,
+            &cache_control,
+        )
+        .body(Body::empty())
+        .expect("valid 304 response");
     }
 
     // --- 4. range vs. full --------------------------------------------------
@@ -77,25 +82,28 @@ pub async fn serve(
         }
         RangeOutcome::Partial { start, end } => {
             let slice = bytes[start as usize..=end as usize].to_vec();
-            base_builder(StatusCode::PARTIAL_CONTENT, &asset.content_type, &etag, &cache_control)
-                .header(
-                    header::CONTENT_RANGE,
-                    format!("bytes {start}-{end}/{total}"),
-                )
-                .body(Body::from(slice))
-                .expect("valid 206 response")
-        }
-        RangeOutcome::Unsatisfiable => {
             base_builder(
-                StatusCode::RANGE_NOT_SATISFIABLE,
+                StatusCode::PARTIAL_CONTENT,
                 &asset.content_type,
                 &etag,
                 &cache_control,
             )
-            .header(header::CONTENT_RANGE, format!("bytes */{total}"))
-            .body(Body::empty())
-            .expect("valid 416 response")
+            .header(
+                header::CONTENT_RANGE,
+                format!("bytes {start}-{end}/{total}"),
+            )
+            .body(Body::from(slice))
+            .expect("valid 206 response")
         }
+        RangeOutcome::Unsatisfiable => base_builder(
+            StatusCode::RANGE_NOT_SATISFIABLE,
+            &asset.content_type,
+            &etag,
+            &cache_control,
+        )
+        .header(header::CONTENT_RANGE, format!("bytes */{total}"))
+        .body(Body::empty())
+        .expect("valid 416 response"),
     }
 }
 
@@ -118,7 +126,10 @@ fn base_builder(
 
 /// True when the request's `If-None-Match` matches our ETag (`*` or an exact list member).
 fn if_none_match_hit(headers: &HeaderMap, etag: &str) -> bool {
-    let Some(raw) = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) else {
+    let Some(raw) = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+    else {
         return false;
     };
     let raw = raw.trim();
@@ -215,24 +226,39 @@ mod tests {
     #[test]
     fn closed_range() {
         let h = hm(header::RANGE, "bytes=0-9");
-        assert_eq!(resolve_range(&h, 100), RangeOutcome::Partial { start: 0, end: 9 });
+        assert_eq!(
+            resolve_range(&h, 100),
+            RangeOutcome::Partial { start: 0, end: 9 }
+        );
     }
 
     #[test]
     fn open_ended_range_clamps_to_last() {
         let h = hm(header::RANGE, "bytes=90-");
-        assert_eq!(resolve_range(&h, 100), RangeOutcome::Partial { start: 90, end: 99 });
+        assert_eq!(
+            resolve_range(&h, 100),
+            RangeOutcome::Partial { start: 90, end: 99 }
+        );
         let h = hm(header::RANGE, "bytes=0-9999");
-        assert_eq!(resolve_range(&h, 100), RangeOutcome::Partial { start: 0, end: 99 });
+        assert_eq!(
+            resolve_range(&h, 100),
+            RangeOutcome::Partial { start: 0, end: 99 }
+        );
     }
 
     #[test]
     fn suffix_range() {
         let h = hm(header::RANGE, "bytes=-10");
-        assert_eq!(resolve_range(&h, 100), RangeOutcome::Partial { start: 90, end: 99 });
+        assert_eq!(
+            resolve_range(&h, 100),
+            RangeOutcome::Partial { start: 90, end: 99 }
+        );
         // Suffix larger than the body clamps to the whole body.
         let h = hm(header::RANGE, "bytes=-500");
-        assert_eq!(resolve_range(&h, 100), RangeOutcome::Partial { start: 0, end: 99 });
+        assert_eq!(
+            resolve_range(&h, 100),
+            RangeOutcome::Partial { start: 0, end: 99 }
+        );
     }
 
     #[test]
@@ -252,10 +278,19 @@ mod tests {
     #[test]
     fn if_none_match_matches_etag_and_star() {
         let etag = "\"deadbeef\"";
-        assert!(if_none_match_hit(&hm(header::IF_NONE_MATCH, "\"deadbeef\""), etag));
+        assert!(if_none_match_hit(
+            &hm(header::IF_NONE_MATCH, "\"deadbeef\""),
+            etag
+        ));
         assert!(if_none_match_hit(&hm(header::IF_NONE_MATCH, "*"), etag));
-        assert!(if_none_match_hit(&hm(header::IF_NONE_MATCH, "W/\"deadbeef\""), etag));
-        assert!(!if_none_match_hit(&hm(header::IF_NONE_MATCH, "\"other\""), etag));
+        assert!(if_none_match_hit(
+            &hm(header::IF_NONE_MATCH, "W/\"deadbeef\""),
+            etag
+        ));
+        assert!(!if_none_match_hit(
+            &hm(header::IF_NONE_MATCH, "\"other\""),
+            etag
+        ));
         assert!(!if_none_match_hit(&HeaderMap::new(), etag));
     }
 }

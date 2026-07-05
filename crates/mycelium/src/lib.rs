@@ -90,8 +90,9 @@ pub async fn build_state_from_env() -> Result<AppState, String> {
     let store_kind = env_nonempty("MYCELIUM_STORE").unwrap_or_else(|| "memory".to_string());
     let store: Arc<dyn Store> = match store_kind.as_str() {
         "postgres" => {
-            let database_url = env_nonempty("MYCELIUM_DATABASE_URL")
-                .ok_or_else(|| "MYCELIUM_STORE=postgres requires MYCELIUM_DATABASE_URL".to_string())?;
+            let database_url = env_nonempty("MYCELIUM_DATABASE_URL").ok_or_else(|| {
+                "MYCELIUM_STORE=postgres requires MYCELIUM_DATABASE_URL".to_string()
+            })?;
             tracing::info!("MYCELIUM_STORE=postgres — connecting to database");
             let pg = PgStore::connect(&database_url)
                 .await
@@ -103,7 +104,11 @@ pub async fn build_state_from_env() -> Result<AppState, String> {
             Arc::new(pg)
         }
         "memory" => Arc::new(InMemoryStore::new()),
-        other => return Err(format!("unknown MYCELIUM_STORE={other} (use memory|postgres)")),
+        other => {
+            return Err(format!(
+                "unknown MYCELIUM_STORE={other} (use memory|postgres)"
+            ))
+        }
     };
 
     let audit = AuditSink::start(

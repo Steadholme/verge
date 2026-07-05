@@ -41,7 +41,10 @@ pub async fn index(State(state): State<AppState>, headers: HeaderMap) -> Respons
 /// content-addressed on the blob volume, persist the metadata row, and surface the public `/a/`
 /// URL. CSRF-checked; size-capped. Handles BOTH `multipart/form-data` (the upload form) and a
 /// JSON / urlencoded `{origin_url}` body.
-pub async fn create_asset(State(state): State<AppState>, req: Request) -> Result<Response, AppError> {
+pub async fn create_asset(
+    State(state): State<AppState>,
+    req: Request,
+) -> Result<Response, AppError> {
     let headers = req.headers().clone();
     let who = auth::identity(&headers);
     let content_type = headers
@@ -84,7 +87,8 @@ pub async fn create_asset(State(state): State<AppState>, req: Request) -> Result
                     "Provide a file to upload or an origin URL to fetch.".to_string(),
                 ));
             }
-            let (data, origin_ctype) = fetch_origin(&state.http, url, state.config.max_asset).await?;
+            let (data, origin_ctype) =
+                fetch_origin(&state.http, url, state.config.max_asset).await?;
             let hint = first_nonempty(&input.content_type, &origin_ctype);
             (data, hint, url.to_string(), String::new())
         }
@@ -178,7 +182,12 @@ pub async fn purge(
         }
         if removed {
             tracing::info!(path = %path, "asset purged by path");
-            state.audit.emit(AuditEvent::warning("eddy.purge", &who.email, path, "by path"));
+            state.audit.emit(AuditEvent::warning(
+                "eddy.purge",
+                &who.email,
+                path,
+                "by path",
+            ));
         }
     } else if !hash.is_empty() {
         let n = state.store.delete_by_hash(hash).await?;
@@ -258,7 +267,9 @@ async fn read_multipart(mp: &mut Multipart) -> Result<AssetInput, AppError> {
                 let filename = field.file_name().unwrap_or("").to_string();
                 let client_type = field.content_type().unwrap_or("").to_string();
                 let data = field.bytes().await.map_err(|e| {
-                    AppError::BadRequest(format!("Upload failed (it may exceed the size limit): {e}"))
+                    AppError::BadRequest(format!(
+                        "Upload failed (it may exceed the size limit): {e}"
+                    ))
                 })?;
                 if !data.is_empty() {
                     input.file = Some(UploadedFile {
@@ -445,7 +456,7 @@ async fn build_dashboard(
 </div>
 {banner}
 {stat_grid}
-<div class="layout">
+<div class="eddy-layout">
   <section class="card">
     <div class="card__head"><h2>Cached assets</h2></div>
     <div class="card__body--list">{asset_table}</div>

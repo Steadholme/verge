@@ -1,0 +1,78 @@
+/* Eddy service surface, layered after Odyssey canonical CSS. */
+
+:root {
+  --accent-border: var(--accent-soft-2);
+}
+
+.page-console { background: var(--bg); }
+
+.brand__product {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em; line-height: 1.4;
+  color: var(--accent-2); background: var(--accent-soft);
+  border: 1px solid var(--accent-border); border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+
+.eddy-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+.eddy-layout > * { min-width: 0; }
+@media (max-width: 920px) { .eddy-layout { grid-template-columns: 1fr; } }
+
+input[type=file] {
+  width: 100%; font: inherit; font-size: 13px; color: var(--ink-2);
+  background: var(--surface-2); border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm); padding: 9px 11px; cursor: pointer;
+  transition: border-color .12s, box-shadow .12s;
+}
+input[type=file]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); outline: none; }
+.inline-form { margin: 0; display: inline-flex; }
+
+.log__model { font-weight: 500; }
+.log__model a { word-break: break-all; font-family: var(--mono); font-size: 13px; }
+.log__tokens { font-family: var(--mono); color: var(--ink-3); white-space: nowrap; }
+.log__hash code { font-family: var(--mono); font-size: 12px; }
+.log-empty { padding: 40px 18px; color: var(--ink-3); font-size: 14px; text-align: center; }
+
+.console__head code, .upstream-line code, .log__hash code, .card__body code {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 1px 6px; color: var(--accent-2);
+}
+
+.token-reveal {
+  background: var(--accent-soft); border: 1px solid var(--accent-border);
+  border-radius: var(--radius); padding: 16px 20px; margin: 0 0 24px;
+}
+.token-reveal__label { margin: 0 0 8px; font-weight: 600; font-size: 13px; color: var(--accent-2); }
+.token-reveal__value {
+  display: block; font-family: var(--mono); font-size: 13px; background: var(--surface);
+  border: 1px solid var(--accent-border); border-radius: var(--radius-sm);
+  padding: 12px; word-break: break-all; color: var(--ink);
+}
+.token-reveal__value a { color: inherit; }
+.token-reveal__value a:hover { text-decoration: underline; }
+
+.upstream-line { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.upstream-line__label { font-size: 11.5px; font-weight: 600; letter-spacing: .03em; color: var(--ink-3); text-transform: uppercase; }
+
+.status-code { font-family: var(--mono); font-size: 40px; font-weight: 600; letter-spacing: -.02em; color: var(--accent-2); }
+.message-heading { margin: 8px 0; font-size: 20px; font-weight: 600; color: var(--ink); }
+.message-body { margin: 0 0 24px; color: var(--ink-2); }
+
+@media (max-width: 640px) { .log__hash { display: none; } }
+
+/* App-bar right-side helpers (userbox) — restored: NOT canonical-covered (fix codex over-prune). */
+.allapps {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border: 1px solid var(--border-2); border-radius: 8px; background: var(--surface);
+  font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+}
+.allapps:hover { background: var(--bg-2); color: var(--ink); }
+.allapps svg { width: 14px; height: 14px; opacity: .8; }
+.userchip { display: inline-flex; align-items: center; gap: 8px; padding-left: 4px; }
+.userchip__avatar {
+  width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--c-white); font-weight: 600; font-size: 12px;
+}
+.user-email { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+@media (max-width: 640px) { .user-email { display: none; } }

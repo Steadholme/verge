@@ -25,7 +25,9 @@ async fn pg_store_full_integration() {
     };
 
     // --- connect / migrate (idempotent: run twice) -------------------------
-    let pg = PgStore::connect(&url).await.expect("connect TEST_DATABASE_URL");
+    let pg = PgStore::connect(&url)
+        .await
+        .expect("connect TEST_DATABASE_URL");
     pg.migrate().await.expect("migrate");
     pg.migrate().await.expect("migrate is idempotent");
 
@@ -54,7 +56,10 @@ async fn pg_store_full_integration() {
         ..dev1.clone()
     };
     assert!(
-        matches!(pg.create_device(&dup, &[]).await, Err(StoreError::Conflict(_))),
+        matches!(
+            pg.create_device(&dup, &[]).await,
+            Err(StoreError::Conflict(_))
+        ),
         "duplicate public key rejected"
     );
 
@@ -69,7 +74,9 @@ async fn pg_store_full_integration() {
         last_seen: 0,
         enabled: true,
     };
-    pg.create_device(&dev2, &["db".to_string()]).await.expect("create dev2");
+    pg.create_device(&dev2, &["db".to_string()])
+        .await
+        .expect("create dev2");
 
     // --- list / get --------------------------------------------------------
     let fetched = pg.get_device(&dev1.id).await.expect("get dev1");
@@ -84,7 +91,10 @@ async fn pg_store_full_integration() {
 
     // --- revoke ------------------------------------------------------------
     assert!(pg.revoke_device(&dev1.id).await.expect("revoke"));
-    assert!(!pg.revoke_device("dev_does_not_exist").await.expect("revoke missing"));
+    assert!(!pg
+        .revoke_device("dev_does_not_exist")
+        .await
+        .expect("revoke missing"));
     let after = pg.get_device(&dev1.id).await.expect("refetch");
     assert!(!after.enabled, "revoked device disabled");
 

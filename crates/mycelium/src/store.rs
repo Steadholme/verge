@@ -137,7 +137,11 @@ impl Store for InMemoryStore {
 
     async fn create_device(&self, device: &Device, tags: &[String]) -> Result<(), StoreError> {
         let mut data = self.data.lock().expect("mem lock poisoned");
-        if data.devices.iter().any(|d| d.public_key == device.public_key) {
+        if data
+            .devices
+            .iter()
+            .any(|d| d.public_key == device.public_key)
+        {
             return Err(StoreError::Conflict(format!(
                 "public key already enrolled: {}",
                 device.public_key
@@ -152,11 +156,7 @@ impl Store for InMemoryStore {
         data.devices.push(device.clone());
         for t in tags {
             // PRIMARY KEY(device_id, tag) dedupe.
-            if !data
-                .tags
-                .iter()
-                .any(|(d, tag)| d == &device.id && tag == t)
-            {
+            if !data.tags.iter().any(|(d, tag)| d == &device.id && tag == t) {
                 data.tags.push((device.id.clone(), t.clone()));
             }
         }
@@ -177,7 +177,11 @@ impl Store for InMemoryStore {
     async fn list_acls(&self) -> Vec<Acl> {
         let data = self.data.lock().expect("mem lock poisoned");
         let mut v: Vec<Acl> = data.acls.clone();
-        v.sort_by(|a, b| b.created_at.cmp(&a.created_at).then_with(|| b.id.cmp(&a.id)));
+        v.sort_by(|a, b| {
+            b.created_at
+                .cmp(&a.created_at)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         v
     }
 
@@ -337,13 +341,11 @@ impl PgStore {
         .execute(&self.pool)
         .await?;
         for t in tags {
-            sqlx::query(
-                "INSERT INTO tags (device_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            )
-            .bind(&d.id)
-            .bind(t)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("INSERT INTO tags (device_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(&d.id)
+                .bind(t)
+                .execute(&self.pool)
+                .await?;
         }
         Ok(())
     }

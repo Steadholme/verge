@@ -91,7 +91,9 @@ impl Config {
                     config.dns = c.gateway_string();
                     config.cidr = c;
                 }
-                Err(e) => tracing::warn!(cidr = %v, error = %e, "invalid MESH_CIDR — keeping default"),
+                Err(e) => {
+                    tracing::warn!(cidr = %v, error = %e, "invalid MESH_CIDR — keeping default")
+                }
             }
         }
         if let Some(v) = env_nonempty("MESH_DNS") {

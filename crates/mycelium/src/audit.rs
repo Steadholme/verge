@@ -244,7 +244,12 @@ mod tests {
     fn disabled_sink_is_noop_and_never_drops() {
         let sink = AuditSink::disabled();
         for _ in 0..1000 {
-            sink.emit(AuditEvent::info("mycelium.enroll", "a@b", "dev_1", "ip=10.77.0.2"));
+            sink.emit(AuditEvent::info(
+                "mycelium.enroll",
+                "a@b",
+                "dev_1",
+                "ip=10.77.0.2",
+            ));
         }
         assert_eq!(sink.dropped(), 0);
     }
@@ -265,7 +270,12 @@ mod tests {
     /// An enroll event serializes to exactly the safe shared fields — and NEVER a private key.
     #[test]
     fn enroll_serializes_without_key_material() {
-        let ev = AuditEvent::info("mycelium.enroll", "alice@w33d.xyz", "dev_42", "ip=10.77.0.5");
+        let ev = AuditEvent::info(
+            "mycelium.enroll",
+            "alice@w33d.xyz",
+            "dev_42",
+            "ip=10.77.0.5",
+        );
         let json = serde_json::to_string(&ev).unwrap();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -284,7 +294,12 @@ mod tests {
     async fn emit_never_blocks_when_sink_unreachable() {
         let sink = AuditSink::start(true, "http://127.0.0.1:1/", Some("token"));
         for _ in 0..(QUEUE_CAPACITY * 8) {
-            sink.emit(AuditEvent::info("mycelium.enroll", "u", "dev_1", "ip=10.77.0.2"));
+            sink.emit(AuditEvent::info(
+                "mycelium.enroll",
+                "u",
+                "dev_1",
+                "ip=10.77.0.2",
+            ));
         }
         assert!(
             sink.dropped() > 0,

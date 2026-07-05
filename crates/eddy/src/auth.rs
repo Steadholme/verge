@@ -132,7 +132,10 @@ mod tests {
         let token = new_csrf_token();
         assert_eq!(token.len(), CSRF_LEN);
         let mut h = HeaderMap::new();
-        h.insert(header::COOKIE, format!("{CSRF_COOKIE}={token}").parse().unwrap());
+        h.insert(
+            header::COOKIE,
+            format!("{CSRF_COOKIE}={token}").parse().unwrap(),
+        );
         assert!(verify_csrf(&h, &token));
         assert!(!verify_csrf(&h, "not-the-token"));
         assert!(!verify_csrf(&HeaderMap::new(), &token));

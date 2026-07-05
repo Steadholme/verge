@@ -14,6 +14,7 @@ name = "eddy"
 path = "src/main.rs"
 
 [dependencies]
+odyssey = { path = "../odyssey" }
 # HTTP framework (shared with the rest of the estate): State/Path/Query/Form/Multipart extractors,
 # server-rendered HTML for the SSO console, raw byte responses for the public `/a/` edge. `multipart`
 # enables the streaming file-upload form on `POST /api/assets`.

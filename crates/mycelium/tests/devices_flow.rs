@@ -29,7 +29,10 @@ async fn full_mesh_flow_in_memory() {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    assert!(set_cookie.contains("__Host-csrf="), "GET / mints CSRF cookie");
+    assert!(
+        set_cookie.contains("__Host-csrf="),
+        "GET / mints CSRF cookie"
+    );
     let (_, body) = read(resp).await;
     assert!(body.contains("No devices enrolled yet"));
     assert!(body.contains("10.77.0.0/24"), "CIDR summary shown");
@@ -41,28 +44,60 @@ async fn full_mesh_flow_in_memory() {
 
     // --- enroll with bad CSRF -> 401 ---------------------------------------
     let b = form(&[("name", "nope"), ("csrf_token", "WRONG")]);
-    let (status, _) = call(&state, post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf")))).await;
+    let (status, _) = call(
+        &state,
+        post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf"))),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED, "CSRF mismatch -> 401");
 
     // --- enroll device #1: alice-laptop ------------------------------------
-    let b = form(&[("name", "alice-laptop"), ("tags", "web"), ("csrf_token", CSRF)]);
-    let (status, body) = call(&state, post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf")))).await;
-    assert_eq!(status, StatusCode::OK, "enroll returns the one-time conf page");
+    let b = form(&[
+        ("name", "alice-laptop"),
+        ("tags", "web"),
+        ("csrf_token", CSRF),
+    ]);
+    let (status, body) = call(
+        &state,
+        post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf"))),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "enroll returns the one-time conf page"
+    );
     assert!(body.contains("PrivateKey = "), "private key shown once");
     assert!(body.contains("Address = 10.77.0.2/32"), "first host is .2");
     assert!(body.contains("DNS = 10.77.0.1"), "DNS is the gateway slot");
 
     // --- enroll device #2: db ----------------------------------------------
     let b = form(&[("name", "db"), ("tags", "db"), ("csrf_token", CSRF)]);
-    let (status, body) = call(&state, post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf")))).await;
+    let (status, body) = call(
+        &state,
+        post_csrf("/api/devices", &b, Some(("u_admin", "admin@hf"))),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("Address = 10.77.0.3/32"), "second host is .3");
     // Hub-and-spoke: the client conf carries ONLY the hub peer, never a per-device mesh list.
     assert!(body.contains("[Peer]"), "hub peer block present");
-    assert!(body.contains("Endpoint = vpn.w33d.xyz:51820"), "dials the hub endpoint");
-    assert!(body.contains("AllowedIPs = 10.77.0.0/24"), "routes the whole mesh via the hub");
-    assert!(body.contains("PersistentKeepalive = 25"), "keepalive for NAT traversal");
-    assert!(!body.contains("AllowedIPs = 10.77.0.2/32"), "no per-spoke /32 peer in client conf");
+    assert!(
+        body.contains("Endpoint = vpn.w33d.xyz:51820"),
+        "dials the hub endpoint"
+    );
+    assert!(
+        body.contains("AllowedIPs = 10.77.0.0/24"),
+        "routes the whole mesh via the hub"
+    );
+    assert!(
+        body.contains("PersistentKeepalive = 25"),
+        "keepalive for NAT traversal"
+    );
+    assert!(
+        !body.contains("AllowedIPs = 10.77.0.2/32"),
+        "no per-spoke /32 peer in client conf"
+    );
 
     // --- dashboard now lists both ------------------------------------------
     let (_, dash) = call(&state, get_auth("/", "u_admin", "admin@hf")).await;
@@ -76,24 +111,50 @@ async fn full_mesh_flow_in_memory() {
     // --- re-render the first-listed device's config WITHOUT the private key.
     // The dashboard lists newest-enrolled first, so this is `db` (10.77.0.3); its peer is the hub.
     let first_id = extract_first_device_id(&dash).expect("a device id in the dashboard");
-    let (status, conf) =
-        call(&state, get_auth(&format!("/api/config/{first_id}"), "u_admin", "admin@hf")).await;
+    let (status, conf) = call(
+        &state,
+        get_auth(&format!("/api/config/{first_id}"), "u_admin", "admin@hf"),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(conf.contains("# PrivateKey ="), "re-render omits the real private key");
-    assert!(!conf.contains("\nPrivateKey ="), "no uncommented private key line on re-render");
-    assert!(conf.contains("Address = 10.77.0.3/32"), "re-render keeps the device's own address");
-    assert!(conf.contains("Endpoint = vpn.w33d.xyz:51820"), "re-render dials the hub");
-    assert!(conf.contains("AllowedIPs = 10.77.0.0/24"), "re-render routes the mesh via the hub");
+    assert!(
+        conf.contains("# PrivateKey ="),
+        "re-render omits the real private key"
+    );
+    assert!(
+        !conf.contains("\nPrivateKey ="),
+        "no uncommented private key line on re-render"
+    );
+    assert!(
+        conf.contains("Address = 10.77.0.3/32"),
+        "re-render keeps the device's own address"
+    );
+    assert!(
+        conf.contains("Endpoint = vpn.w33d.xyz:51820"),
+        "re-render dials the hub"
+    );
+    assert!(
+        conf.contains("AllowedIPs = 10.77.0.0/24"),
+        "re-render routes the mesh via the hub"
+    );
 
     // --- config for an unknown device -> 404 -------------------------------
-    let (status, _) = call(&state, get_auth("/api/config/dev_missing", "u_admin", "admin@hf")).await;
+    let (status, _) = call(
+        &state,
+        get_auth("/api/config/dev_missing", "u_admin", "admin@hf"),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     // --- revoke the first-listed device ------------------------------------
     let b = form(&[("csrf_token", CSRF)]);
     let (status, _) = call(
         &state,
-        post_csrf(&format!("/api/devices/{first_id}/revoke"), &b, Some(("u_admin", "admin@hf"))),
+        post_csrf(
+            &format!("/api/devices/{first_id}/revoke"),
+            &b,
+            Some(("u_admin", "admin@hf")),
+        ),
     )
     .await;
     assert_eq!(status, StatusCode::SEE_OTHER, "revoke redirects");
@@ -102,12 +163,27 @@ async fn full_mesh_flow_in_memory() {
     assert!(dash.contains("1 / 2"), "one active of two total");
 
     // --- add an ACL: flips posture to default-deny -------------------------
-    let b = form(&[("src_tag", "web"), ("dst_tag", "db"), ("ports", "443"), ("csrf_token", CSRF)]);
-    let (status, _) = call(&state, post_csrf("/api/acls", &b, Some(("u_admin", "admin@hf")))).await;
+    let b = form(&[
+        ("src_tag", "web"),
+        ("dst_tag", "db"),
+        ("ports", "443"),
+        ("csrf_token", CSRF),
+    ]);
+    let (status, _) = call(
+        &state,
+        post_csrf("/api/acls", &b, Some(("u_admin", "admin@hf"))),
+    )
+    .await;
     assert_eq!(status, StatusCode::SEE_OTHER);
     let (_, dash) = call(&state, get_auth("/", "u_admin", "admin@hf")).await;
-    assert!(dash.contains("default-deny"), "posture flips after first ACL");
-    assert!(dash.contains(">web<") || dash.contains("web"), "src tag shown");
+    assert!(
+        dash.contains("default-deny"),
+        "posture flips after first ACL"
+    );
+    assert!(
+        dash.contains(">web<") || dash.contains("web"),
+        "src tag shown"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +206,9 @@ async fn call(state: &mycelium::AppState, req: Request<Body>) -> (StatusCode, St
 
 async fn read(resp: axum::response::Response) -> (StatusCode, String) {
     let status = resp.status();
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     (status, String::from_utf8_lossy(&bytes).to_string())
 }
 
@@ -155,7 +233,9 @@ fn post_csrf(uri: &str, body: &str, ident: Option<(&str, &str)>) -> Request<Body
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
         .header(header::COOKIE, format!("__Host-csrf={CSRF}"));
     if let Some((sub, email)) = ident {
-        b = b.header("x-auth-subject", sub).header("x-auth-email", email);
+        b = b
+            .header("x-auth-subject", sub)
+            .header("x-auth-email", email);
     }
     b.body(Body::from(body.to_string())).unwrap()
 }
@@ -173,7 +253,9 @@ fn enc(s: &str) -> String {
     let mut o = String::new();
     for b in s.bytes() {
         match b {
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => o.push(b as char),
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                o.push(b as char)
+            }
             b' ' => o.push('+'),
             _ => o.push_str(&format!("%{b:02X}")),
         }

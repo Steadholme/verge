@@ -3,17 +3,31 @@
 //! `health` is the unauthenticated liveness probe; `devices` carries the SSO-gated admin
 //! dashboard and the enroll / revoke / ACL / config-render flow.
 //!
-//! The shared design tokens / CSS are embedded (via `include_str!`) and inlined into every
-//! page, matching the HOLDFAST enterprise brand (the same look as the Keystone login UI):
-//! brand gradient, indigo accent, cards, app-bar.
+//! Odyssey canonical CSS plus Mycelium service CSS are embedded and inlined into every page.
 
 pub mod devices;
 pub mod health;
 
+use std::sync::OnceLock;
+
 use axum::http::StatusCode;
 
+/// Mycelium-only CSS layered after Odyssey's canonical font, tokens, and components.
+pub const SERVICE_CSS: &str = include_str!("../../static/service.css");
+
+static APP_CSS: OnceLock<String> = OnceLock::new();
+
 /// Embedded design system, inlined into each rendered page's `<style>`.
-pub const APP_CSS: &str = include_str!("../../static/app.css");
+pub fn app_css() -> &'static str {
+    APP_CSS
+        .get_or_init(|| {
+            let mut css = String::with_capacity(odyssey::APP_CSS.len() + SERVICE_CSS.len());
+            css.push_str(odyssey::APP_CSS);
+            css.push_str(SERVICE_CSS);
+            css
+        })
+        .as_str()
+}
 
 /// Cross-subdomain gateway logout (Mycelium lives at mesh.w33d.xyz; the IdP is at id.w33d.xyz).
 pub const LOGOUT_URL: &str = "https://sso.w33d.xyz/_gw/auth/logout";
@@ -123,7 +137,7 @@ pub fn error_page(status: StatusCode, message: &str) -> String {
   </div>
 </main>
 </body></html>"#,
-        css = APP_CSS,
+        css = app_css(),
         topbar = topbar("Mycelium", "—"),
         code = code,
         reason = esc(reason),

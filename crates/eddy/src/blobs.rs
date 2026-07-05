@@ -52,7 +52,10 @@ pub trait Blobs: Send + Sync {
 
 /// A valid content-address key is exactly 64 lowercase hex chars (a SHA-256 digest).
 fn valid_key(key: &str) -> bool {
-    key.len() == 64 && key.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    key.len() == 64
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 // --------------------------------------------------------------------------------------
@@ -233,7 +236,13 @@ mod tests {
     #[tokio::test]
     async fn rejects_non_hex_key() {
         let store = MemoryBlobs::new();
-        assert!(matches!(store.get("../escape").await, Err(BlobError::InvalidKey)));
-        assert!(matches!(store.put("short", vec![1]).await, Err(BlobError::InvalidKey)));
+        assert!(matches!(
+            store.get("../escape").await,
+            Err(BlobError::InvalidKey)
+        ));
+        assert!(matches!(
+            store.put("short", vec![1]).await,
+            Err(BlobError::InvalidKey)
+        ));
     }
 }

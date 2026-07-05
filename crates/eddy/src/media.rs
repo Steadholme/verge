@@ -154,7 +154,10 @@ mod tests {
 
     #[test]
     fn normalize_rejects_traversal_and_empty() {
-        assert_eq!(normalize_path("/css/app.css"), Some("css/app.css".to_string()));
+        assert_eq!(
+            normalize_path("/css/app.css"),
+            Some("css/app.css".to_string())
+        );
         assert_eq!(normalize_path("logo.png"), Some("logo.png".to_string()));
         assert!(normalize_path("../etc/passwd").is_none());
         assert!(normalize_path("a//b").is_none());
@@ -178,7 +181,10 @@ mod tests {
 
     #[test]
     fn content_type_prefers_extension_then_magic() {
-        assert_eq!(resolve_content_type("a/app.css", b"body{}", ""), "text/css; charset=utf-8");
+        assert_eq!(
+            resolve_content_type("a/app.css", b"body{}", ""),
+            "text/css; charset=utf-8"
+        );
         assert_eq!(
             resolve_content_type("blob", &[0x89, b'P', b'N', b'G', 0, 0], ""),
             "image/png"

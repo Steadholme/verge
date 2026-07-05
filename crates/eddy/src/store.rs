@@ -96,7 +96,11 @@ impl Store for InMemoryStore {
         let assets = self.assets.lock().expect("assets lock poisoned");
         let mut v: Vec<Asset> = assets.clone();
         // Newest-first; ties broken by id so output is stable.
-        v.sort_by(|a, b| b.created_at.cmp(&a.created_at).then_with(|| b.id.cmp(&a.id)));
+        v.sort_by(|a, b| {
+            b.created_at
+                .cmp(&a.created_at)
+                .then_with(|| b.id.cmp(&a.id))
+        });
         v.truncate(LIST_LIMIT);
         v
     }
@@ -249,10 +253,13 @@ impl PgStore {
     }
 
     async fn get_by_path_async(&self, path: &str) -> Result<Option<Asset>, sqlx::Error> {
-        let row = sqlx::query(&format!("SELECT {} FROM assets WHERE path = $1", Self::COLS))
-            .bind(path)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row = sqlx::query(&format!(
+            "SELECT {} FROM assets WHERE path = $1",
+            Self::COLS
+        ))
+        .bind(path)
+        .fetch_optional(&self.pool)
+        .await?;
         match row {
             Some(r) => Ok(Some(Self::asset_from_row(&r)?)),
             None => Ok(None),
@@ -340,7 +347,8 @@ impl Store for PgStore {
             .fetch_one(&self.pool)
             .await
             .map_err(|e| StoreError::Backend(e.to_string()))?;
-        row.try_get("n").map_err(|e| StoreError::Backend(e.to_string()))
+        row.try_get("n")
+            .map_err(|e| StoreError::Backend(e.to_string()))
     }
 
     async fn stats(&self) -> CacheStats {

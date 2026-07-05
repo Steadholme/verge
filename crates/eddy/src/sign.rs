@@ -25,7 +25,13 @@ pub fn sign(key: &[u8], path: &str, exp: i64) -> String {
 
 /// Verify a presented `(exp, sig)` for `path` against `key` at wall-clock `now`. Returns `Ok(())`
 /// when the signature matches AND the link has not expired; otherwise an explanatory error string.
-pub fn verify(key: &[u8], path: &str, exp: i64, sig_hex: &str, now: i64) -> Result<(), &'static str> {
+pub fn verify(
+    key: &[u8],
+    path: &str,
+    exp: i64,
+    sig_hex: &str,
+    now: i64,
+) -> Result<(), &'static str> {
     if exp != 0 && now > exp {
         return Err("signed link expired");
     }

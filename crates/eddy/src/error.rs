@@ -56,7 +56,9 @@ impl From<crate::store::StoreError> for AppError {
 impl From<crate::blobs::BlobError> for AppError {
     fn from(e: crate::blobs::BlobError) -> Self {
         match e {
-            crate::blobs::BlobError::NotFound => AppError::NotFound("cached bytes not found".to_string()),
+            crate::blobs::BlobError::NotFound => {
+                AppError::NotFound("cached bytes not found".to_string())
+            }
             other => AppError::Internal(other.to_string()),
         }
     }

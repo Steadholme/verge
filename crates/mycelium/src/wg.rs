@@ -206,9 +206,9 @@ pub fn render_conf(private_key: Option<&str>, address: &str, dns: &str, hub: &Hu
     out.push_str("[Interface]\n");
     match private_key {
         Some(pk) => out.push_str(&format!("PrivateKey = {pk}\n")),
-        None => out.push_str(
-            "# PrivateKey = <kept only on the device; re-issued config omits it>\n",
-        ),
+        None => {
+            out.push_str("# PrivateKey = <kept only on the device; re-issued config omits it>\n")
+        }
     }
     out.push_str(&format!("Address = {address}/32\n"));
     out.push_str(&format!("DNS = {dns}\n"));
@@ -316,7 +316,10 @@ mod tests {
         for ip in (cidr.network + 2)..cidr.broadcast() {
             taken.insert(ip);
         }
-        assert!(cidr.allocate(&taken).is_none(), "pool exhausted before broadcast");
+        assert!(
+            cidr.allocate(&taken).is_none(),
+            "pool exhausted before broadcast"
+        );
     }
 
     #[test]
@@ -332,7 +335,10 @@ mod tests {
         taken.insert(first);
         assert!(c30.allocate(&taken).is_none());
         // /32 holds nothing.
-        assert!(Cidr::parse("10.0.0.9/32").unwrap().allocate(&HashSet::new()).is_none());
+        assert!(Cidr::parse("10.0.0.9/32")
+            .unwrap()
+            .allocate(&HashSet::new())
+            .is_none());
     }
 
     #[test]

@@ -124,7 +124,10 @@ pub async fn build_state_from_env() -> Result<AppState, String> {
     let blobs_kind = env_nonempty("EDDY_BLOBS").unwrap_or_else(|| "memory".to_string());
     let blobs: Arc<dyn Blobs> = match blobs_kind.as_str() {
         "fs" => {
-            tracing::info!(root = config.blobs_root(), "EDDY_BLOBS=fs — content-addressed on volume");
+            tracing::info!(
+                root = config.blobs_root(),
+                "EDDY_BLOBS=fs — content-addressed on volume"
+            );
             Arc::new(
                 FsBlobs::open(&config.blobs_root())
                     .await

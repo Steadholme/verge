@@ -19,7 +19,7 @@ use crate::audit::AuditEvent;
 use crate::auth;
 use crate::config::Config;
 use crate::error::AppError;
-use crate::handlers::{esc, fmt_date, topbar, APP_CSS};
+use crate::handlers::{app_css, esc, fmt_date, topbar};
 use crate::store::{self, Acl, Device};
 use crate::wg::{self, PeerView};
 use crate::{now_nanos, now_secs, AppState};
@@ -83,7 +83,7 @@ pub async fn dashboard(State(state): State<AppState>, headers: HeaderMap) -> Res
     let acl_rows = render_acl_rows(&acls);
 
     let page = DASHBOARD_HTML
-        .replace("{{CSS}}", APP_CSS)
+        .replace("{{CSS}}", app_css())
         .replace("{{TOPBAR}}", &topbar("Mesh control plane", &email))
         .replace("{{CIDR}}", &esc(&state.config.cidr.to_text()))
         .replace("{{DNS}}", &esc(&state.config.dns))
@@ -96,7 +96,10 @@ pub async fn dashboard(State(state): State<AppState>, headers: HeaderMap) -> Res
                 &state.config.endpoint_domain
             }),
         )
-        .replace("{{DEVICE_COUNT}}", &format!("{enabled_count} / {}", devices.len()))
+        .replace(
+            "{{DEVICE_COUNT}}",
+            &format!("{enabled_count} / {}", devices.len()),
+        )
         .replace("{{ACL_COUNT}}", &acls.len().to_string())
         .replace("{{POSTURE}}", posture)
         .replace("{{CSRF}}", &esc(&csrf))
@@ -123,7 +126,9 @@ pub async fn enroll(
 
     let name = form.name.trim();
     if name.is_empty() {
-        return Err(AppError::InvalidRequest("device name is required".to_string()));
+        return Err(AppError::InvalidRequest(
+            "device name is required".to_string(),
+        ));
     }
     if name.chars().count() > 120 {
         return Err(AppError::InvalidRequest(
@@ -188,7 +193,7 @@ pub async fn enroll(
     tracing::info!(device = %device.id, ip = %device.mesh_ip, "device enrolled");
 
     let page = ENROLLED_HTML
-        .replace("{{CSS}}", APP_CSS)
+        .replace("{{CSS}}", app_css())
         .replace("{{TOPBAR}}", &topbar("Device enrolled", &email))
         .replace("{{NAME}}", &esc(&device.name))
         .replace("{{MESH_IP}}", &esc(&device.mesh_ip))
@@ -284,7 +289,12 @@ pub async fn config(
         .ok_or_else(|| AppError::NotFound("no such device".to_string()))?;
 
     // Re-render is hub-and-spoke too: [Interface] (no private key) + the single hub [Peer].
-    let conf = wg::render_conf(None, &device.mesh_ip, &state.config.dns, &state.config.hub_peer());
+    let conf = wg::render_conf(
+        None,
+        &device.mesh_ip,
+        &state.config.dns,
+        &state.config.hub_peer(),
+    );
 
     let filename = format!("{}.conf", wg::slugify(&device.name));
     let mut resp = (StatusCode::OK, conf).into_response();
@@ -442,7 +452,12 @@ fn render_acl_rows(acls: &[Acl]) -> String {
 
 /// Normalize an ACL tag: trim, lowercase, single token; empty -> `*` wildcard.
 fn normalize_tag(raw: &str) -> String {
-    let t = raw.trim().split_whitespace().next().unwrap_or("").to_ascii_lowercase();
+    let t = raw
+        .trim()
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
     if t.is_empty() {
         "*".to_string()
     } else {
@@ -464,7 +479,10 @@ fn normalize_ports(raw: &str) -> String {
 fn redirect(location: &str) -> Response {
     (
         StatusCode::SEE_OTHER,
-        [(header::LOCATION, HeaderValue::from_str(location).expect("valid location"))],
+        [(
+            header::LOCATION,
+            HeaderValue::from_str(location).expect("valid location"),
+        )],
     )
         .into_response()
 }

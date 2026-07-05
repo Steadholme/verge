@@ -246,7 +246,12 @@ mod tests {
     fn disabled_sink_is_noop_and_never_drops() {
         let sink = AuditSink::disabled();
         for _ in 0..1000 {
-            sink.emit(AuditEvent::warning("eddy.purge", "a@b", "css/app.css", "by path"));
+            sink.emit(AuditEvent::warning(
+                "eddy.purge",
+                "a@b",
+                "css/app.css",
+                "by path",
+            ));
         }
         assert_eq!(sink.dropped(), 0);
     }
