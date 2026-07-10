@@ -62,6 +62,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/devices/{id}/revoke", post(handlers::devices::revoke))
         .route("/api/acls", post(handlers::devices::add_acl))
         .route("/api/config/{id}", get(handlers::devices::config))
+        // Reject a forged gateway identity (spoofed X-Auth-* from a rogue in-network peer that
+        // bypasses Sluice): when GATEWAY_HMAC_KEY is set, an injected identity MUST carry a valid
+        // X-Auth-Sig. No-op for the anonymous dashboard / healthz (no identity) and in local dev.
+        .layer(axum::middleware::from_fn(auth::require_gateway_sig))
         .with_state(state)
 }
 

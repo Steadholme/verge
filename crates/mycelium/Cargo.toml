@@ -48,6 +48,10 @@ base64 = "0.22"
 # macros, so the build needs NO database. rustls TLS (no openssl). Standard SQL only, so the
 # same statements later run unchanged on FusionDB over pgwire.
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres"] }
+# Verify the gateway identity HMAC (X-Auth-Sig): HMAC-SHA256 over `subject\ngroups\nminute`,
+# byte-identical to Sluice's Go SignIdentity and the rest of the estate (portal/familiar/...).
+hmac = "0.12"
+sha2 = "0.10"
 
 [dev-dependencies]
 # ServiceExt::oneshot drives the Router in-process for the end-to-end tests (no port bind).

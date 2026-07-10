@@ -67,14 +67,22 @@ pub struct AppState {
 /// is sized to the configured `max_asset` plus a small multipart-envelope headroom.
 pub fn app(state: AppState) -> Router {
     let body_limit = state.config.max_asset.saturating_add(1024 * 1024);
-    Router::new()
-        .route("/healthz", get(handlers::health::healthz))
-        // --- SSO web console + management API ---
+    // SSO web console + management API. Behind a configured gateway (GATEWAY_HMAC_KEY set) these
+    // MUST carry a valid, signed X-Auth identity — `require_console_identity` rejects a forged or
+    // unsigned identity AND closes the dev-identity fallback to a rogue peer reaching Eddy directly.
+    // No-op in local dev (key unset).
+    let console = Router::new()
         .route("/", get(handlers::console::index))
         .route("/api/assets", post(handlers::console::create_asset))
         .route("/api/purge", post(handlers::console::purge))
-        // --- public content-addressed edge ---
-        .route("/a/{*path}", get(handlers::serve::serve))
+        .layer(axum::middleware::from_fn(auth::require_console_identity));
+    // Public surfaces: liveness + the content-addressed edge (a browser <img> speaks no SSO), so
+    // they are NOT identity-gated.
+    let public = Router::new()
+        .route("/healthz", get(handlers::health::healthz))
+        .route("/a/{*path}", get(handlers::serve::serve));
+    console
+        .merge(public)
         .layer(DefaultBodyLimit::max(body_limit))
         .with_state(state)
 }

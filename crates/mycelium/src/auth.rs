@@ -50,6 +50,98 @@ pub fn require_operator(headers: &HeaderMap) -> Result<(String, String), AppErro
     Ok((sub, mail))
 }
 
+// ---------------------------------------------------------------------------
+// Gateway identity signature (X-Auth-Sig) verification
+// ---------------------------------------------------------------------------
+//
+// Mycelium sits behind a Sluice `auth=sso` route, which STRIPS inbound `X-Auth-*` and re-injects
+// verified headers plus an HMAC `X-Auth-Sig` (when GATEWAY_HMAC_KEY is configured). A rogue peer
+// reaching Mycelium's port directly (bypassing Sluice) could otherwise forge `X-Auth-Subject` to
+// satisfy `require_operator` and enroll/revoke mesh peers. `require_gateway_sig` rejects any
+// request whose injected identity is unsigned or invalid; the anonymous read-only dashboard and
+// `/healthz` (no identity header) still pass.
+
+pub const HEADER_GROUPS: &str = "x-auth-groups";
+/// HMAC binding the injected identity to a 1-minute window (set by Sluice when GATEWAY_HMAC_KEY set).
+pub const HEADER_SIG: &str = "x-auth-sig";
+
+/// The shared gateway HMAC key, read once from `GATEWAY_HMAC_KEY`. Empty (unset) disables
+/// verification — the pre-signature behavior, fully backward compatible (local dev / tests).
+fn gateway_key() -> &'static str {
+    use std::sync::OnceLock;
+    static KEY: OnceLock<String> = OnceLock::new();
+    KEY.get_or_init(|| std::env::var("GATEWAY_HMAC_KEY").unwrap_or_default())
+        .as_str()
+}
+
+/// Whether the gateway-injected identity is authentic. When `GATEWAY_HMAC_KEY` is set and ANY
+/// identity header is present, a valid `X-Auth-Sig` — HMAC-SHA256 over `subject "\n" groups "\n"
+/// minute` for the current OR previous minute — is required. `true` when the key is unset, or no
+/// identity header is present, or the signature is valid; `false` when an identity is present but
+/// the signature is missing/invalid.
+pub fn gateway_identity_ok(headers: &HeaderMap) -> bool {
+    gateway_identity_ok_with(gateway_key(), headers)
+}
+
+fn gateway_identity_ok_with(key: &str, headers: &HeaderMap) -> bool {
+    if key.is_empty() {
+        return true;
+    }
+    let subject = header_value(headers, HEADER_SUBJECT).unwrap_or_default();
+    let groups = header_value(headers, HEADER_GROUPS).unwrap_or_default();
+    let has_email = header_value(headers, HEADER_EMAIL).is_some();
+    if subject.is_empty() && groups.is_empty() && !has_email {
+        return true; // no injected identity to verify (anonymous dashboard / healthz / dev)
+    }
+    let Some(sig) = header_value(headers, HEADER_SIG) else {
+        return false; // identity present but unsigned — reject
+    };
+    let win = crate::now_secs() / 60;
+    [win, win - 1]
+        .iter()
+        .any(|&w| ct_eq(sig.as_bytes(), sign_identity(key, &subject, &groups, w).as_bytes()))
+}
+
+/// Middleware rejecting a forged gateway identity with 401. No-op when the key is unset or no
+/// identity is present.
+pub async fn require_gateway_sig(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if gateway_identity_ok(req.headers()) {
+        next.run(req).await
+    } else {
+        (
+            axum::http::StatusCode::UNAUTHORIZED,
+            "invalid or missing gateway identity signature",
+        )
+            .into_response()
+    }
+}
+
+/// Recompute the gateway signature — byte-identical to Sluice's `auth.SignIdentity` (Go) and the
+/// rest of the estate (portal/familiar/...). The cross-language contract is pinned by test.
+fn sign_identity(key: &str, subject: &str, groups: &str, window: i64) -> String {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key.as_bytes()).expect("HMAC accepts any key len");
+    mac.update(subject.as_bytes());
+    mac.update(b"\n");
+    mac.update(groups.as_bytes());
+    mac.update(b"\n");
+    mac.update(window.to_string().as_bytes());
+    to_hex(&mac.finalize().into_bytes())
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
 fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get(name)
@@ -173,5 +265,35 @@ mod tests {
         let (sub, mail) = require_operator(&headers).unwrap();
         assert_eq!(sub, "u_123");
         assert_eq!(mail, "a@holdfast.local");
+    }
+
+    #[test]
+    fn sign_identity_matches_go_vector() {
+        // MUST equal sluice/internal/auth/sig_test.go (and portal/familiar) — the cross-lang contract.
+        assert_eq!(
+            sign_identity("test-key", "usr_alice", "admins,devs", 1),
+            "ddc77236dcfb03dd9f462f7c84e1b25e58f5fc380997695a689e6c3ac4bb3777"
+        );
+        assert_eq!(
+            sign_identity("test-key", "usr_bob", "", 2),
+            "930f82fb1224e69c9c5bc46e545c3b108b1eeb6c9078c7a33fc24f30c595f658"
+        );
+    }
+
+    #[test]
+    fn gateway_rejects_forged_identity() {
+        // C4: key set + forged subject without sig => reject (would otherwise satisfy require_operator).
+        let mut forged = HeaderMap::new();
+        forged.insert(HEADER_SUBJECT, "usr_eve".parse().unwrap());
+        assert!(!gateway_identity_ok_with("test-key", &forged));
+        // Anonymous (no identity headers) => ok even with key set (read-only dashboard / healthz).
+        assert!(gateway_identity_ok_with("test-key", &HeaderMap::new()));
+        // Valid signature => accept.
+        let win = crate::now_secs() / 60;
+        let sig = sign_identity("test-key", "usr_alice", "", win);
+        let mut ok = HeaderMap::new();
+        ok.insert(HEADER_SUBJECT, "usr_alice".parse().unwrap());
+        ok.insert(HEADER_SIG, sig.parse().unwrap());
+        assert!(gateway_identity_ok_with("test-key", &ok));
     }
 }
