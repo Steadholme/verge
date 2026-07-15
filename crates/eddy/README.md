@@ -1,6 +1,6 @@
 # Eddy — static-asset edge cache / mini-CDN
 
-Eddy is a self-hosted edge for static assets in the HOLDFAST sovereign-infra estate. It stores
+Eddy is a self-hosted edge for static assets in the Steadholme sovereign-infra estate. It stores
 assets **content-addressed** on a local volume, serves them from a public `/a/…` path with strong
 ETags + `Cache-Control` + conditional `304` + `Range`, and supports **exact** invalidation and
 optional **HMAC-signed** URLs — so user IPs and assets stay private and cache busting is precise.

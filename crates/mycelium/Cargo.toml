@@ -2,7 +2,7 @@
 name = "mycelium"
 version = "0.1.0"
 edition = "2021"
-description = "Mycelium — zero-trust WireGuard mesh control plane (enrollment, peers, ACLs, config generation) for the HOLDFAST stack."
+description = "Mycelium — zero-trust WireGuard mesh control plane (enrollment, peers, ACLs, config generation) for the Steadholme stack."
 license = "MIT OR Apache-2.0"
 
 [lib]

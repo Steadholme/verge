@@ -2,7 +2,7 @@
 name = "verge"
 version = "0.1.0"
 edition = "2021"
-description = "Verge — one deployable hosting the HOLDFAST edge surfaces (static edge cache / WireGuard mesh control plane) behind a Host-based vhost demux on a DUAL listener (:9220 + :9290). Each surface keeps its own database, routes, subdomain and port; this binary just composes the two library crates so the estate runs one container instead of two."
+description = "Verge — one deployable hosting the Steadholme edge surfaces (static edge cache / WireGuard mesh control plane) behind a Host-based vhost demux on a DUAL listener (:9220 + :9290). Each surface keeps its own database, routes, subdomain and port; this binary just composes the two library crates so the estate runs one container instead of two."
 license = "MIT OR Apache-2.0"
 
 [[bin]]

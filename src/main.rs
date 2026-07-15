@@ -1,4 +1,4 @@
-//! Verge — one container hosting the HOLDFAST edge surfaces (static edge cache / WireGuard mesh
+//! Verge — one container hosting the Steadholme edge surfaces (static edge cache / WireGuard mesh
 //! control plane).
 //!
 //! Each surface is its OWN library crate (Eddy/Mycelium), reused verbatim: same schema, same

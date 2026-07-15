@@ -2,7 +2,7 @@
 name = "eddy"
 version = "0.1.0"
 edition = "2021"
-description = "Eddy — sovereign static-asset edge cache / mini-CDN for the HOLDFAST stack (content-addressed, signed, exactly invalidated)."
+description = "Eddy — sovereign static-asset edge cache / mini-CDN for the Steadholme stack (content-addressed, signed, exactly invalidated)."
 license = "MIT OR Apache-2.0"
 
 [lib]

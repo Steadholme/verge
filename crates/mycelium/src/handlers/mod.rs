@@ -32,7 +32,7 @@ pub fn app_css() -> &'static str {
 /// Cross-subdomain gateway logout (Mycelium lives at mesh.w33d.xyz; the IdP is at id.w33d.xyz).
 pub const LOGOUT_URL: &str = "https://sso.w33d.xyz/_gw/auth/logout";
 
-/// The HOLDFAST shield glyph (small, for the app-bar brand lockup).
+/// The Steadholme shield glyph (small, for the app-bar brand lockup).
 pub const SHIELD_SVG: &str = r##"<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="hf-shield-sm" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#818CF8"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs><path d="M24 4 8 9.5V22c0 11 7 17.4 16 21.5C33 39.4 40 33 40 22V9.5L24 4Z" fill="url(#hf-shield-sm)"/><rect x="20" y="19" width="8" height="13" rx="1" fill="#fff" fill-opacity="0.92"/><path d="M20 19v-2.5a4 4 0 0 1 8 0V19" stroke="#fff" stroke-width="2" stroke-opacity="0.92" fill="none"/></svg>"##;
 
 /// Minimal HTML escaping for text/attribute interpolation (defense-in-depth on every field).
@@ -44,7 +44,7 @@ pub fn esc(s: &str) -> String {
         .replace('\'', "&#x27;")
 }
 
-/// Render the shared app-bar: shield + HOLDFAST wordmark + page title on the left; an "All apps"
+/// Render the shared app-bar: shield + Steadholme wordmark + page title on the left; an "All apps"
 /// link back to the apex portal, the signed-in user chip (avatar initial + email), and a Logout
 /// link to the gateway on the right. A blank / placeholder email (`""` or `"—"`) is treated as a
 /// no-session page: the user chip is omitted and only the All-apps link is shown.
@@ -67,9 +67,9 @@ pub fn topbar(page_title: &str, email: &str) -> String {
     format!(
         r#"<header class="topbar">
   <div class="topbar__inner">
-    <a class="brand" href="/" aria-label="HOLDFAST Mycelium">
+    <a class="brand" href="/" aria-label="Steadholme Mycelium">
       <span class="brand__glyph" aria-hidden="true">{shield}</span>
-      <span class="brand__word">HOLDFAST</span>
+      <span class="brand__word">Steadholme</span>
     </a>
     <div class="topbar__right">
       <span class="topbar__title">{title}</span>

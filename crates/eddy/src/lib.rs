@@ -1,4 +1,4 @@
-//! Eddy — sovereign static-asset edge cache / mini-CDN for the HOLDFAST stack.
+//! Eddy — sovereign static-asset edge cache / mini-CDN for the Steadholme stack.
 //!
 //! Library root: defines [`AppState`], wires the routes via [`app`], and provides
 //! [`build_dev_state`] (in-memory store + blobs, audit off) and [`build_state_from_env`]

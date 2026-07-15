@@ -214,7 +214,7 @@ pub fn render_conf(private_key: Option<&str>, address: &str, dns: &str, hub: &Hu
     out.push_str(&format!("DNS = {dns}\n"));
 
     out.push('\n');
-    out.push_str("# hub — HOLDFAST WireGuard gateway (hub-and-spoke)\n");
+    out.push_str("# hub — Steadholme WireGuard gateway (hub-and-spoke)\n");
     out.push_str("[Peer]\n");
     out.push_str(&format!("PublicKey = {}\n", hub.public_key));
     out.push_str(&format!("Endpoint = {}\n", hub.endpoint));

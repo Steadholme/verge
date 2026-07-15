@@ -1,4 +1,4 @@
-//! Mycelium — zero-trust WireGuard mesh CONTROL PLANE for the HOLDFAST stack.
+//! Mycelium — zero-trust WireGuard mesh CONTROL PLANE for the Steadholme stack.
 //!
 //! Mycelium is a self-hosted coordination server (think Tailscale's control plane): it enrolls
 //! devices, manages peers + ACLs, and GENERATES valid WireGuard configs. It does NOT bring up a
