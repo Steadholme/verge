@@ -97,9 +97,12 @@ fn gateway_identity_ok_with(key: &str, headers: &HeaderMap) -> bool {
         return false; // identity present but unsigned — reject
     };
     let win = crate::now_secs() / 60;
-    [win, win - 1]
-        .iter()
-        .any(|&w| ct_eq(sig.as_bytes(), sign_identity(key, &subject, &groups, w).as_bytes()))
+    [win, win - 1].iter().any(|&w| {
+        ct_eq(
+            sig.as_bytes(),
+            sign_identity(key, &subject, &groups, w).as_bytes(),
+        )
+    })
 }
 
 /// Middleware rejecting a forged gateway identity with 401. No-op when the key is unset or no

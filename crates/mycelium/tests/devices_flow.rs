@@ -5,8 +5,11 @@
 //! keygen + IP assignment + one-time conf), hub-and-spoke conf generation, the no-private-key re-render,
 //! revoke, and ACL add (posture flip).
 
+use std::sync::Arc;
+
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
+use mycelium::clash::ClashSubscription;
 use mycelium::{app, build_dev_state};
 use tower::ServiceExt;
 
@@ -186,6 +189,80 @@ async fn full_mesh_flow_in_memory() {
     );
 }
 
+#[tokio::test]
+async fn clash_profile_link_is_authenticated_csrf_protected_and_publicly_downloadable() {
+    let mut state = build_dev_state();
+    state.clash = Some(Arc::new(
+        ClashSubscription::new(
+            b"proxies:\n  - name: DMIT-HK\n".to_vec(),
+            b"0123456789abcdef0123456789abcdef".to_vec(),
+            "https://vpn.example.test",
+        )
+        .unwrap(),
+    ));
+
+    let (status, _) = call(&state, get("/profiles")).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let (status, page) = call(&state, get_auth("/profiles", "u_admin", "admin@hf")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Generate online subscription"));
+    assert!(page.contains("independent from WireGuard"));
+
+    let (status, _) = call(
+        &state,
+        get_auth("/api/clash/capability", "u_admin", "admin@hf"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let body = form(&[("csrf_token", CSRF)]);
+    let response = app(state.clone())
+        .oneshot(post_csrf(
+            "/api/clash/subscription-link",
+            &body,
+            Some(("u_admin", "admin@hf")),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
+    let (_, link_page) = read(response).await;
+    let token = extract_subscription_token(&link_page).expect("subscription token in link page");
+    assert!(!token.contains("u_admin"));
+
+    let response = app(state.clone())
+        .oneshot(get(&format!("/subscription/clash?token={token}")))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("text/yaml; charset=utf-8")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
+    let (_, profile) = read(response).await;
+    assert_eq!(profile, "proxies:\n  - name: DMIT-HK\n");
+
+    let (status, _) = call(&state, get(&format!("/subscription/clash?token={token}x"))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
@@ -196,6 +273,14 @@ fn extract_first_device_id(html: &str) -> Option<String> {
     let start = html.find(marker)? + marker.len();
     let rest = &html[start..];
     let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
+fn extract_subscription_token(html: &str) -> Option<String> {
+    let marker = "/subscription/clash?token=";
+    let start = html.find(marker)? + marker.len();
+    let rest = &html[start..];
+    let end = rest.find(['\"', '&', '<'])?;
     Some(rest[..end].to_string())
 }
 

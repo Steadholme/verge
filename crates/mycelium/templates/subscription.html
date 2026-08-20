@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <title>Clash subscription ready · Steadholme</title>
+  <style>{{CSS}}</style>
+</head>
+<body class="page-console">
+{{TOPBAR}}
+<main class="console">
+  <div class="console__head">
+    <h1>Subscription ready</h1>
+    <p class="sub">Copy this URL into Clash Verge within {{TTL_MINUTES}} minutes, or download the YAML now.</p>
+  </div>
+
+  <section class="card">
+    <div class="card__head"><h2>Temporary URL</h2></div>
+    <div class="card__body">
+      <div class="field">
+        <label for="subscription-url">Online subscription URL</label>
+        <input class="mono" id="subscription-url" type="text" readonly value="{{URL}}" spellcheck="false">
+      </div>
+      <div class="field field--submit">
+        <a class="btn btn-primary" href="{{URL}}">Download Clash profile</a>
+        <a class="btn btn-ghost" href="/profiles">Generate another</a>
+      </div>
+      <p class="note">Expires at Unix time <code>{{EXPIRES_AT}}</code>. This page and the profile response are marked <code>no-store</code>.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

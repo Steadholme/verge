@@ -24,6 +24,7 @@
 
 pub mod audit;
 pub mod auth;
+pub mod clash;
 pub mod config;
 pub mod error;
 pub mod handlers;
@@ -47,6 +48,9 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub store: Arc<dyn Store>,
     pub audit: AuditSink,
+    /// Optional short-lived Clash subscription service. Production loads profile bytes and the
+    /// independent signing key from read-only runtime files; dev stays disabled by default.
+    pub clash: Option<Arc<clash::ClashSubscription>>,
     /// Serializes the read-then-write IP allocation during enroll so two concurrent enrollments
     /// can never pick the same mesh IP. The DB UNIQUE(mesh_ip) constraint is the backstop.
     pub enroll_lock: Arc<Mutex<()>>,
@@ -58,6 +62,14 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(handlers::health::healthz))
         .route("/", get(handlers::devices::dashboard))
+        .route("/profiles", get(handlers::clash::profile_page))
+        .route("/static/dashboard.js", get(handlers::clash::dashboard_js))
+        .route("/api/clash/capability", get(handlers::clash::capability))
+        .route(
+            "/api/clash/subscription-link",
+            post(handlers::clash::issue_subscription),
+        )
+        .route("/subscription/clash", get(handlers::clash::download))
         .route("/api/devices", post(handlers::devices::enroll))
         .route("/api/devices/{id}/revoke", post(handlers::devices::revoke))
         .route("/api/acls", post(handlers::devices::add_acl))
@@ -76,6 +88,7 @@ pub fn build_dev_state() -> AppState {
         config: Arc::new(Config::dev()),
         store: Arc::new(InMemoryStore::new()),
         audit: AuditSink::disabled(),
+        clash: None,
         enroll_lock: Arc::new(Mutex::new(())),
     }
 }
@@ -125,6 +138,7 @@ pub async fn build_state_from_env() -> Result<AppState, String> {
         config: Arc::new(config),
         store,
         audit,
+        clash: clash::from_env()?,
         enroll_lock: Arc::new(Mutex::new(())),
     })
 }

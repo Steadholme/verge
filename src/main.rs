@@ -218,6 +218,7 @@ async fn build_mesh() -> Result<Router, String> {
         config: Arc::new(mycelium::config::Config::from_env()),
         store: Arc::new(pg),
         audit,
+        clash: mycelium::clash::from_env()?,
         enroll_lock: Arc::new(Mutex::new(())),
     };
     Ok(mycelium::app(state))

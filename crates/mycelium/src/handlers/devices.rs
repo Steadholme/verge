@@ -453,7 +453,6 @@ fn render_acl_rows(acls: &[Acl]) -> String {
 /// Normalize an ACL tag: trim, lowercase, single token; empty -> `*` wildcard.
 fn normalize_tag(raw: &str) -> String {
     let t = raw
-        .trim()
         .split_whitespace()
         .next()
         .unwrap_or("")

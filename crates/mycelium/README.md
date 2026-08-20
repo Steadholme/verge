@@ -23,6 +23,9 @@ this host.
 | `POST /api/devices/{id}/revoke` | SSO + CSRF | Revoke (disable) a device |
 | `POST /api/acls` | SSO + CSRF | Add an ACL rule (`src_tag → dst_tag` on `ports`) |
 | `GET /api/config/{id}` | SSO | Re-render a device's `wg.conf` **without** the private key |
+| `GET /profiles` | SSO + `vpn.profile.subscribe` | Independent Clash profile page |
+| `POST /api/clash/subscription-link` | SSO + IAM + CSRF | Mint a 10-minute Clash subscription URL |
+| `GET /subscription/clash?token=…` | HMAC capability | Download the Clash YAML without an SSO cookie |
 
 State-changing POSTs are double-submit CSRF protected (`__Host-csrf` cookie + hidden field).
 Audit events `mycelium.enroll` / `mycelium.revoke` are emitted to Watchtower (non-blocking).
@@ -39,6 +42,9 @@ Audit events `mycelium.enroll` / `mycelium.revoke` are emitted to Watchtower (no
 | `MESH_ENDPOINT_DOMAIN` | `mesh.w33d.xyz` | Suffix for peer `Endpoint` hostnames (empty disables `Endpoint`) |
 | `MESH_LISTEN_PORT` | `51820` | WireGuard port baked into peer `Endpoint`s |
 | `AUDIT_ENABLED` / `WATCHTOWER_URL` / `AUDIT_INGEST_TOKEN` | off | Watchtower audit emitter |
+| `CLASH_SUBSCRIPTION_FILE` | — | Read-only Clash YAML loaded at startup |
+| `CLASH_SUBSCRIPTION_SIGNING_KEY_FILE` | — | Independent 32–512 byte visible-ASCII HMAC key file |
+| `CLASH_PUBLIC_BASE_URL` | `https://vpn.w33d.xyz` | Base URL used in generated subscription links |
 
 Boots **zero-config** on the in-memory store (no database, no network).
 

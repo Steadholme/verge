@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <title>VPN Profile · Steadholme</title>
+  <style>{{CSS}}</style>
+</head>
+<body class="page-console">
+{{TOPBAR}}
+<main class="console">
+  <div class="console__head">
+    <h1>VPN Profile</h1>
+    <p class="sub">Generate a short-lived online subscription for Clash Verge. This access is independent from WireGuard device management.</p>
+  </div>
+
+  <section class="card">
+    <div class="card__head"><h2>Clash subscription</h2></div>
+    <div class="card__body">
+      <p>The profile contains the DMIT Hong Kong and United States nodes with the MESL rule set. The generated URL remains valid for <strong>{{TTL_MINUTES}} minutes</strong>.</p>
+      <form method="post" action="/api/clash/subscription-link">
+        <input type="hidden" name="csrf_token" value="{{CSRF}}">
+        <button class="btn btn-primary" type="submit">Generate online subscription</button>
+      </form>
+      <p class="note">Treat the URL as a password while it is active. Node credentials are never stored in the application repository.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

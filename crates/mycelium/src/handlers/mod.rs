@@ -5,6 +5,7 @@
 //!
 //! Odyssey canonical CSS plus Mycelium service CSS are embedded and inlined into every page.
 
+pub mod clash;
 pub mod devices;
 pub mod health;
 

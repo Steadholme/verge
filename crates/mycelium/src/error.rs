@@ -29,6 +29,10 @@ pub enum AppError {
     /// Unexpected internal failure (store I/O).
     #[error("server_error: {0}")]
     Internal(String),
+
+    /// A configured capability is temporarily unavailable.
+    #[error("unavailable: {0}")]
+    Unavailable(String),
 }
 
 impl AppError {
@@ -39,6 +43,7 @@ impl AppError {
             AppError::NotFound(d) => (StatusCode::NOT_FOUND, d.clone(), false),
             AppError::Conflict(d) => (StatusCode::CONFLICT, d.clone(), false),
             AppError::Internal(d) => (StatusCode::INTERNAL_SERVER_ERROR, d.clone(), false),
+            AppError::Unavailable(d) => (StatusCode::SERVICE_UNAVAILABLE, d.clone(), false),
         }
     }
 }
