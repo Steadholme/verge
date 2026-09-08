@@ -11,8 +11,8 @@
 //! BEACON estate probes hit those ports directly (`eddy:9220` / `mycelium:9290`). To keep BOTH
 //! probes working unchanged, Verge binds the SAME demux router on BOTH ports: the host-agnostic
 //! top-level `GET /healthz` answers for every alias on either listener, and a caller reaching
-//! `mesh.w33d.xyz`/`vpn.w33d.xyz` (or the bare `mycelium`/`mesh` label) on either port is dispatched
-//! to Mycelium, `edge.w33d.xyz`/`eddy`/`edge` to Eddy.
+//! `mesh.w33d.xyz`/`vpn.w33d.xyz`/`vpn-ui.w33d.xyz` (or the bare `mycelium`/`mesh` label) on either
+//! port is dispatched to Mycelium, `edge.w33d.xyz`/`eddy`/`edge` to Eddy.
 //!
 //! Mycelium is the WireGuard CONTROL PLANE only (enroll/peers/ACLs/config generation) — it brings
 //! up NO kernel tunnel on this host, so it is pure HTTP and safe to co-host behind the demux.
@@ -126,10 +126,11 @@ async fn dispatch(State(v): State<Vhosts>, req: Request) -> Response {
         .unwrap_or("");
     let router = match label {
         "edge" | "eddy" => v.edge,
-        // `vpn.w33d.xyz` is the operator-facing name for the WireGuard enrollment portal — the same
-        // Mycelium control plane served at `mesh.w33d.xyz` (the VPN hub UDP endpoint itself is
-        // `vpn.w33d.xyz:51820`, unrelated to this HTTP surface).
-        "mesh" | "mycelium" | "vpn" => v.mesh,
+        // `vpn.w33d.xyz` is the operator-facing WireGuard enrollment portal and `vpn-ui.w33d.xyz`
+        // is the separate Clash-profile IAM surface. Both use the same Mycelium control plane
+        // served at `mesh.w33d.xyz` (the VPN hub UDP endpoint itself is `vpn.w33d.xyz:51820`,
+        // unrelated to this HTTP surface).
+        "mesh" | "mycelium" | "vpn" | "vpn-ui" => v.mesh,
         _ => return (StatusCode::NOT_FOUND, "unknown edge host").into_response(),
     };
     // `Router` is a tower `Service` (the exact `app(state).oneshot(req)` path the surfaces' own
@@ -137,6 +138,30 @@ async fn dispatch(State(v): State<Vhosts>, req: Request) -> Response {
     match router.oneshot(req).await {
         Ok(resp) => resp,
         Err(e) => match e {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::{to_bytes, Body};
+
+    #[tokio::test]
+    async fn vpn_ui_host_dispatches_to_mesh() {
+        let vhosts = Vhosts {
+            edge: Router::new().fallback(|| async { "edge" }),
+            mesh: Router::new().fallback(|| async { "mesh" }),
+        };
+        let request = Request::builder()
+            .uri("/subscription/clash?token=test")
+            .header(header::HOST, "vpn-ui.w33d.xyz")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = dispatch(State(vhosts), request).await;
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+
+        assert_eq!(&body[..], b"mesh");
     }
 }
 
