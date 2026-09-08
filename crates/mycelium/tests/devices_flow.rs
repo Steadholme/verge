@@ -16,6 +16,25 @@ use tower::ServiceExt;
 const CSRF: &str = "tok_csrf_for_tests";
 
 #[tokio::test]
+async fn stylesheet_is_versioned_and_immutable() {
+    let resp = app(build_dev_state())
+        .oneshot(get("/assets/mycelium-20260908.css"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        resp.headers().get(header::CONTENT_TYPE).unwrap(),
+        "text/css; charset=utf-8"
+    );
+    assert_eq!(
+        resp.headers().get(header::CACHE_CONTROL).unwrap(),
+        "public, max-age=31536000, immutable"
+    );
+    let (_, css) = read(resp).await;
+    assert!(css.len() > 100_000);
+}
+
+#[tokio::test]
 async fn full_mesh_flow_in_memory() {
     let state = build_dev_state();
 
@@ -39,6 +58,8 @@ async fn full_mesh_flow_in_memory() {
     let (_, body) = read(resp).await;
     assert!(body.contains("No devices enrolled yet"));
     assert!(body.contains("10.77.0.0/24"), "CIDR summary shown");
+    assert!(body.contains(r#"<link rel="stylesheet" href="/assets/mycelium-20260908.css">"#));
+    assert!(!body.contains("<style>"));
 
     // --- enroll without identity -> 401 ------------------------------------
     let b = form(&[("name", "nope"), ("csrf_token", CSRF)]);

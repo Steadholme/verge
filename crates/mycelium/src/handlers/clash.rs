@@ -11,7 +11,7 @@ use crate::audit::AuditEvent;
 use crate::auth;
 use crate::clash::{TokenError, PROFILE_FILENAME, SUBSCRIPTION_TTL_SECONDS};
 use crate::error::AppError;
-use crate::handlers::{app_css, esc, topbar};
+use crate::handlers::{esc, shell, topbar};
 use crate::{now_secs, AppState};
 
 const PROFILE_HTML: &str = include_str!("../../templates/profile.html");
@@ -66,8 +66,7 @@ pub async fn profile_page(
         ));
     }
     let (csrf, set_cookie) = auth::ensure_csrf(&headers);
-    let page = PROFILE_HTML
-        .replace("{{CSS}}", app_css())
+    let page = shell(PROFILE_HTML, &headers)
         .replace("{{TOPBAR}}", &topbar("VPN Profile", &email))
         .replace("{{CSRF}}", &esc(&csrf))
         .replace(
@@ -101,9 +100,8 @@ pub async fn issue_subscription(
         &format!("expires_at={expires_at}"),
     ));
 
-    let page = SUBSCRIPTION_HTML
-        .replace("{{CSS}}", app_css())
-        .replace("{{TOPBAR}}", &topbar("VPN Profile", &email))
+    let page = shell(SUBSCRIPTION_HTML, &headers)
+        .replace("{{TOPBAR}}", &topbar("Subscription ready", &email))
         .replace("{{URL}}", &esc(&url))
         .replace("{{EXPIRES_AT}}", &expires_at.to_string())
         .replace(

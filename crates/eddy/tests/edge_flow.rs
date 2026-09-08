@@ -84,6 +84,48 @@ async fn healthz_is_ok() {
 }
 
 #[tokio::test]
+async fn stylesheet_is_versioned_and_immutable() {
+    let resp = app(build_dev_state())
+        .oneshot(
+            Request::builder()
+                .uri("/assets/eddy-20260908.css")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        resp.headers().get(header::CONTENT_TYPE).unwrap(),
+        "text/css; charset=utf-8"
+    );
+    assert_eq!(
+        resp.headers().get(header::CACHE_CONTROL).unwrap(),
+        "public, max-age=31536000, immutable"
+    );
+    assert!(body_bytes(resp).await.len() > 100_000);
+}
+
+#[tokio::test]
+async fn console_links_the_shared_stylesheet_without_inlining_it() {
+    let resp = app(build_dev_state())
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header("x-auth-subject", "u_admin")
+                .header("x-auth-email", "admin@w33d.xyz")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let html = String::from_utf8(body_bytes(resp).await).unwrap();
+    assert!(html.contains(r#"<link rel="stylesheet" href="/assets/eddy-20260908.css">"#));
+    assert!(!html.contains("<style>"));
+}
+
+#[tokio::test]
 async fn upload_then_serve_with_validators_and_range() {
     let app = app(build_dev_state());
     let content = b"body{color:rebeccapurple}";

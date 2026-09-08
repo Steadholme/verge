@@ -61,6 +61,7 @@ pub struct AppState {
 pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(handlers::health::healthz))
+        .route(handlers::APP_CSS_PATH, get(handlers::app_css_asset))
         .route("/", get(handlers::devices::dashboard))
         .route("/profiles", get(handlers::clash::profile_page))
         .route("/static/dashboard.js", get(handlers::clash::dashboard_js))

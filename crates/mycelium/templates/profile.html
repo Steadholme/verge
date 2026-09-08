@@ -1,32 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{{THEME_ATTR}}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="{{COLOR_SCHEME}}">
   <meta name="referrer" content="no-referrer">
-  <title>VPN Profile · Steadholme</title>
-  <style>{{CSS}}</style>
+  <title>VPN Profile · Verge</title>
+  <link rel="stylesheet" href="{{CSS_PATH}}">
 </head>
-<body class="page-console">
+<body class="page-v2">
 {{TOPBAR}}
-<main class="console">
-  <div class="console__head">
-    <h1>VPN Profile</h1>
-    <p class="sub">Generate a short-lived online subscription for Clash Verge. This access is independent from WireGuard device management.</p>
-  </div>
+<main class="v2-page v2-narrow">
+  <header class="pagehead">
+    <div class="pagehead__titles">
+      <h1>VPN Profile</h1>
+      <p class="pagehead__sub">Clash subscription · {{TTL_MINUTES}}-minute link · independent from WireGuard device management</p>
+    </div>
+  </header>
 
   <section class="card">
     <div class="card__head"><h2>Clash subscription</h2></div>
-    <div class="card__body">
-      <p>The profile contains the DMIT Hong Kong and United States nodes with the MESL rule set. The generated URL remains valid for <strong>{{TTL_MINUTES}} minutes</strong>.</p>
+    <div class="defs">
+      <div class="defs__row"><span class="defs__term">Nodes</span><span class="defs__value">DMIT Hong Kong · DMIT United States</span></div>
+      <div class="defs__row"><span class="defs__term">Rule set</span><span class="defs__value">MESL</span></div>
+      <div class="defs__row"><span class="defs__term">Link TTL</span><span class="defs__value">{{TTL_MINUTES}} minutes</span></div>
+      <div class="defs__row"><span class="defs__term">Permission</span><span class="defs__value">vpn.profile.subscribe · granted</span></div>
+      <div class="defs__row"><span class="defs__term">Credentials</span><span class="defs__value">never stored in the application repository</span></div>
+    </div>
+    <div class="card__pad">
       <form method="post" action="/api/clash/subscription-link">
         <input type="hidden" name="csrf_token" value="{{CSRF}}">
-        <button class="btn btn-primary" type="submit">Generate online subscription</button>
+        <button class="btn btn-primary" type="submit">{{ICON_LINK}}Generate online subscription</button>
       </form>
-      <p class="note">Treat the URL as a password while it is active. Node credentials are never stored in the application repository.</p>
     </div>
   </section>
+
+  <section class="card">
+    <div class="card__head"><h2>How it works</h2></div>
+    <div class="card__pad"><div class="steps">
+      <div class="step step--done"><span class="step__mark" aria-hidden="true">{{ICON_CHECK}}</span><div><div class="step__label">Generate</div><div class="step__who">HMAC capability token · {{TTL_MINUTES}} minutes</div></div></div>
+      <div class="step step--waiting"><span class="step__mark" aria-hidden="true">{{ICON_CLOCK}}</span><div><div class="step__label">Paste into Clash Verge</div><div class="step__who">Profiles → URL → Download</div></div></div>
+      <div class="step step--waiting"><span class="step__mark" aria-hidden="true">{{ICON_CLOCK}}</span><div><div class="step__label">Expiry</div><div class="step__who">link dies · profile stays on the device</div></div></div>
+    </div></div>
+  </section>
+
+  <footer class="v2-foot">
+    <span class="v2-foot__lead">Steadholme Verge · mesh · edge · vpn</span>
+    <a href="https://status.w33d.xyz">Status</a>
+    <a href="https://w33d.xyz">All apps</a>
+  </footer>
 </main>
 </body>
 </html>

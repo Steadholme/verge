@@ -6,8 +6,8 @@
 //! - [`serve`] — the public content-addressed edge (`/a/{*path}`): ETag / Cache-Control / 304 /
 //!   Range.
 //!
-//! Odyssey canonical CSS plus Eddy service CSS are embedded and inlined into every console
-//! page. All producer-supplied text (asset paths, origin
+//! Odyssey canonical CSS plus Eddy service CSS are embedded and served as one versioned,
+//! immutable stylesheet. All producer-supplied text (asset paths, origin
 //! URLs) is HTML-escaped on render — the console injects NO raw HTML.
 
 pub mod console;
@@ -16,15 +16,18 @@ pub mod serve;
 
 use std::sync::OnceLock;
 
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 
 /// Eddy-only CSS layered after Odyssey's canonical font, tokens, and components.
 pub const SERVICE_CSS: &str = include_str!("../../static/service.css");
 
+/// Versioned stylesheet URL. Change the date whenever the embedded CSS changes.
+pub const APP_CSS_PATH: &str = "/assets/eddy-20260908.css";
+
 static APP_CSS: OnceLock<String> = OnceLock::new();
 
-/// Embedded design system, inlined into each rendered page's `<style>`.
+/// Embedded design system, assembled once per process.
 pub fn app_css() -> &'static str {
     APP_CSS
         .get_or_init(|| {
@@ -36,8 +39,39 @@ pub fn app_css() -> &'static str {
         .as_str()
 }
 
-/// The Steadholme shield glyph (small, for the app-bar brand lockup).
-pub const SHIELD_SVG: &str = r##"<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="hf-shield-sm" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#818CF8"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs><path d="M24 4 8 9.5V22c0 11 7 17.4 16 21.5C33 39.4 40 33 40 22V9.5L24 4Z" fill="url(#hf-shield-sm)"/><rect x="20" y="19" width="8" height="13" rx="1" fill="#fff" fill-opacity="0.92"/><path d="M20 19v-2.5a4 4 0 0 1 8 0V19" stroke="#fff" stroke-width="2" stroke-opacity="0.92" fill="none"/></svg>"##;
+/// Identity-independent stylesheet with an immutable one-year cache policy.
+pub async fn app_css_asset() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/css; charset=utf-8"),
+            ),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            ),
+        ],
+        app_css(),
+    )
+}
+
+/// 24px stroke icons (Figma Icon/UI sheet).
+pub const ICON_NETWORK: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/></svg>"#;
+pub const ICON_CLOUD: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H7a4 4 0 0 1-.7-7.9A5.5 5.5 0 0 1 17 9.5h.5a4.75 4.75 0 0 1 0 9.5Z"/></svg>"#;
+pub const ICON_SHIELD: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.5 8.6 8 11 4.5-2.4 8-6 8-11V5l-8-3Z"/></svg>"#;
+pub const ICON_GRID: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>"#;
+pub const ICON_UPLOAD_CLOUD: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 16l-4-4-4 4M12 12v9"/><path d="M20.4 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 3 15.3"/></svg>"#;
+pub const ICON_IMAGE: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>"#;
+pub const ICON_FILE_CODE: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>"#;
+pub const ICON_FILE: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>"#;
+pub const ICON_KEY: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M15 8l3 3M18 5l2 2"/></svg>"#;
+pub const ICON_CHECK: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>"#;
+pub const ICON_CLOCK: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.6V12l3 1.8"/></svg>"#;
+pub const ICON_TRASH: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>"#;
+pub const ICON_PLUS: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>"#;
+pub const ICON_REFRESH: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>"#;
+pub const ICON_EXTERNAL: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>"#;
 
 /// Cross-subdomain SSO logout (terminated at the Keystone IdP behind the gateway).
 pub const LOGOUT_URL: &str = "https://sso.w33d.xyz/_gw/auth/logout";
@@ -83,15 +117,70 @@ pub fn human_size(bytes: i64) -> String {
     }
 }
 
-/// Render the shared HTML page shell with the app-bar. `title` is the app-bar page label, `email`
-/// the signed-in identity (shown when known), `body` the already-escaped main content HTML.
+/// Fill the shell slots every page shares (theme from the gateway cookie, stylesheet, suite bar).
+pub fn page_with(headers: &axum::http::HeaderMap, title: &str, email: Option<&str>, body: &str) -> String {
+    let cookie = headers.get(header::COOKIE).and_then(|v| v.to_str().ok());
+    let theme = odyssey::resolve_theme(cookie);
+    PAGE_HTML
+        .replace("{{THEME_ATTR}}", odyssey::html_theme_attr(theme))
+        .replace("{{COLOR_SCHEME}}", odyssey::color_scheme_meta(theme))
+        .replace("{{CSS_PATH}}", APP_CSS_PATH)
+        .replace("{{TITLE}}", &esc(title))
+        .replace("{{TOPBAR}}", &suite_bar(email))
+        .replace("{{BODY}}", body)
+}
+
+/// Render the shared HTML page shell (no request headers available → light theme).
 pub fn page(title: &str, email: Option<&str>, body: &str) -> String {
     PAGE_HTML
-        .replace("{{CSS}}", app_css())
-        .replace("{{SHIELD}}", SHIELD_SVG)
+        .replace("{{THEME_ATTR}}", "")
+        .replace("{{COLOR_SCHEME}}", "light")
+        .replace("{{CSS_PATH}}", APP_CSS_PATH)
         .replace("{{TITLE}}", &esc(title))
-        .replace("{{USERBOX}}", &userbox(title, email))
+        .replace("{{TOPBAR}}", &suite_bar(email))
         .replace("{{BODY}}", body)
+}
+
+/// The Verge suite bar with the Edge pill active: brand tile + Steadholme/Verge, host, the three
+/// surface pills, All apps, the signed-in identity chip, and the gateway logout.
+pub fn suite_bar(email: Option<&str>) -> String {
+    let chip = match email {
+        Some(e) if !e.is_empty() => {
+            let initial = e
+                .chars()
+                .next()
+                .map(|c| c.to_uppercase().to_string())
+                .unwrap_or_else(|| "W".to_string());
+            format!(
+                "<span class=\"userchip\"><span class=\"userchip__avatar\" aria-hidden=\"true\">{}</span><span class=\"user-email\" title=\"Signed in as\">{}</span></span>",
+                esc(&initial),
+                esc(e),
+            )
+        }
+        _ => "<span class=\"user-email user-email--none\" title=\"Signed in as\">— (no gateway session)</span>".to_string(),
+    };
+    format!(
+        concat!(
+            "<header class=\"suitebar\">",
+            "<a class=\"suitebar__brand\" href=\"/\" aria-label=\"Verge home\"><span class=\"brand-tile\" aria-hidden=\"true\">{net}</span><span class=\"suitebar__name\"><b>Steadholme</b><span>Verge</span></span></a>",
+            "<span class=\"suitebar__host\">edge.w33d.xyz</span>",
+            "<nav class=\"surfaces\" aria-label=\"Surfaces\">",
+            "<a class=\"surf surf--mesh\" href=\"https://mesh.w33d.xyz/\">{net}Mesh</a>",
+            "<a class=\"surf surf--edge is-active\" href=\"/\">{cloud}Edge</a>",
+            "<a class=\"surf surf--vpn\" href=\"https://vpn-ui.w33d.xyz/profiles\">{shield}VPN</a>",
+            "</nav><span class=\"suitebar__spacer\"></span><div class=\"suitebar__right\">",
+            "<a class=\"allapps\" href=\"https://w33d.xyz\" title=\"All apps\">{grid}<span>All apps</span></a>",
+            "{chip}",
+            "<a class=\"btn btn-ghost btn-sm\" href=\"{logout}\">Log out</a>",
+            "</div></header>",
+        ),
+        net = ICON_NETWORK,
+        cloud = ICON_CLOUD,
+        shield = ICON_SHIELD,
+        grid = ICON_GRID,
+        chip = chip,
+        logout = LOGOUT_URL,
+    )
 }
 
 /// Wrap a rendered page in an HTML response that also (re)sets the CSRF cookie.
@@ -113,41 +202,6 @@ pub fn redirect(location: &str) -> Response {
         .into_response()
 }
 
-/// The right side of the app-bar: a page title, an "All apps" link back to the apex portal, the
-/// signed-in identity chip (avatar initial + email, when known), and the cross-subdomain logout
-/// link. Shared by every page so the chrome stays identical across the estate.
-pub fn userbox(title: &str, email: Option<&str>) -> String {
-    let chip = match email {
-        Some(e) if !e.is_empty() => {
-            let initial = e
-                .chars()
-                .next()
-                .map(|c| c.to_uppercase().to_string())
-                .unwrap_or_else(|| "H".to_string());
-            format!(
-                "<span class=\"userchip\"><span class=\"userchip__avatar\" aria-hidden=\"true\">{}</span><span class=\"user-email\">{}</span></span>",
-                esc(&initial),
-                esc(e),
-            )
-        }
-        _ => String::new(),
-    };
-    format!(
-        concat!(
-            "<span class=\"topbar__title\">{title}</span>",
-            "<a class=\"allapps\" href=\"https://w33d.xyz\" title=\"All apps\">",
-            "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">",
-            "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/>",
-            "<rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/></svg>All apps</a>",
-            "{chip}",
-            "<a class=\"btn btn-ghost btn-sm\" href=\"{LOGOUT_URL}\">Log out</a>",
-        ),
-        title = esc(title),
-        chip = chip,
-        LOGOUT_URL = LOGOUT_URL,
-    )
-}
-
 /// Render the branded error page (used by [`crate::error::AppError`]).
 pub fn render_error(
     status: StatusCode,
@@ -156,9 +210,10 @@ pub fn render_error(
     email: Option<&str>,
 ) -> (StatusCode, Html<String>) {
     let body = ERROR_HTML
-        .replace("{{CSS}}", app_css())
-        .replace("{{SHIELD}}", SHIELD_SVG)
-        .replace("{{USERBOX}}", &userbox("Eddy", email))
+        .replace("{{THEME_ATTR}}", "")
+        .replace("{{COLOR_SCHEME}}", "light")
+        .replace("{{CSS_PATH}}", APP_CSS_PATH)
+        .replace("{{TOPBAR}}", &suite_bar(email))
         .replace("{{STATUS}}", &status.as_u16().to_string())
         .replace("{{HEADING}}", &esc(heading))
         .replace("{{MESSAGE}}", &esc(message));

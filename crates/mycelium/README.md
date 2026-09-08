@@ -88,3 +88,12 @@ cargo test                       # in-memory flow + unit tests (no DB)
 # Postgres store test (optional, needs an external DB):
 #   TEST_DATABASE_URL=postgres://… cargo test --test pg_store -- --nocapture
 ```
+
+## 前端 v2（2026-09-08）
+
+Mesh 控制面、Device enrolled、VPN Profile、Subscription ready 四个页面按 Figma
+文件 `BYTQUgcUowEbuwaFOLvk0Q`（Verge，moss accent）重做：Steadholme 中性系统 +
+苔绿强调色、套件栏（Mesh / Edge / VPN）、摘要瓦片、设备表、访问控制表、
+wg0.conf 代码块、一次性密钥横幅、URL 揭示块。样式在
+`static/service.css`，与 Odyssey 基底层叠后由 `/assets/mycelium-20260908.css`
+以不可变缓存提供；改样式时同步提升该路径里的日期（测试会断言路径）。

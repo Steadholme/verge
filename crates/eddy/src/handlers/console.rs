@@ -16,7 +16,7 @@ use crate::audit::AuditEvent;
 use crate::auth::{self, Identity};
 use crate::config::Config;
 use crate::error::AppError;
-use crate::handlers::{esc, html_with_csrf, human_size, page, redirect, short};
+use crate::handlers::{esc, html_with_csrf, human_size, page_with, redirect, short, ICON_CLOCK, ICON_EXTERNAL, ICON_FILE, ICON_FILE_CODE, ICON_IMAGE, ICON_KEY, ICON_PLUS, ICON_TRASH, ICON_UPLOAD_CLOUD};
 use crate::media;
 use crate::store::{Asset, CacheStats};
 use crate::{now_secs, random_alnum, sha256_hex, sign, AppState};
@@ -30,7 +30,7 @@ const ASSET_ID_LEN: usize = 16;
 pub async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let who = auth::identity(&headers);
     let csrf = auth::new_csrf_token();
-    render(&state, &who, &csrf, Reveal::None).await
+    render(&state, &headers, &who, &csrf, Reveal::None).await
 }
 
 // ===========================================================================
@@ -140,7 +140,7 @@ pub async fn create_asset(
 
     let url = public_url(&state.config, &path);
     let csrf = auth::new_csrf_token();
-    Ok(render(&state, &who, &csrf, Reveal::Url(&url)).await)
+    Ok(render(&state, &headers, &who, &csrf, Reveal::Url(&url)).await)
 }
 
 // ===========================================================================
@@ -424,92 +424,157 @@ enum Reveal<'a> {
     Url(&'a str),
 }
 
-/// Render the dashboard, optionally with a success banner showing a new asset's public URL.
-async fn render(state: &AppState, who: &Identity, csrf: &str, reveal: Reveal<'_>) -> Response {
+/// Render the dashboard, optionally with the new asset's public URL revealed above the table.
+async fn render(
+    state: &AppState,
+    headers: &HeaderMap,
+    who: &Identity,
+    csrf: &str,
+    reveal: Reveal<'_>,
+) -> Response {
     let body = build_dashboard(state, who, csrf, &reveal).await;
-    html_with_csrf(StatusCode::OK, page("Eddy", Some(&who.email), &body), csrf)
+    html_with_csrf(
+        StatusCode::OK,
+        page_with(headers, "Static edge", Some(&who.email), &body),
+        csrf,
+    )
 }
 
 async fn build_dashboard(
     state: &AppState,
-    who: &Identity,
+    _who: &Identity,
     csrf: &str,
     reveal: &Reveal<'_>,
 ) -> String {
     let assets = state.store.list_assets().await;
     let stats = state.store.stats().await;
 
-    let banner = render_banner(reveal);
+    let reveal_html = render_reveal(reveal);
     let stat_grid = render_stats(&stats, state.blobs.backend());
     let asset_table = render_assets(&assets, csrf, &state.config);
-
-    let signing = if state.config.signing_enabled() {
-        "<code>on</code> — public URLs carry an HMAC <code>?exp=&amp;sig=</code>"
+    let signed = state.config.signing_enabled();
+    let signed_pill = if signed {
+        format!(r#"<span class="signed signed--on">{ICON_KEY}Signed URLs on</span>"#)
     } else {
-        "<code>off</code> — assets are served from <code>/a/…</code> unsigned"
+        format!(r#"<span class="signed">{ICON_KEY}Signed URLs off</span>"#)
+    };
+    let signed_defs = if signed {
+        format!(
+            "?exp=&amp;sig= · HMAC · TTL {} s",
+            state.config.signed_ttl
+        )
+    } else {
+        "unsigned · /a/… served as-is".to_string()
+    };
+    let head_sub = format!(
+        "{} · {} · {} · content-addressed · exact purge",
+        esc(&host_of(&state.config.public_base_url)),
+        plural(stats.count as usize, "asset", "assets"),
+        esc(&human_size(stats.total_bytes)),
+    );
+    let first_steps = if assets.is_empty() {
+        format!(
+            r#"<section class="card"><div class="card__head"><h2>First asset</h2></div><div class="card__pad"><div class="steps">
+<div class="step step--waiting"><span class="step__mark" aria-hidden="true">{ICON_CLOCK}</span><div><div class="step__label">Upload a file or fetch an origin URL</div><div class="step__who">max {max}</div></div></div>
+<div class="step step--waiting"><span class="step__mark" aria-hidden="true">{ICON_CLOCK}</span><div><div class="step__label">Public path</div><div class="step__who">optional · derived from the URL or filename · else the sha256</div></div></div>
+<div class="step step--waiting"><span class="step__mark" aria-hidden="true">{ICON_CLOCK}</span><div><div class="step__label">Serve from /a/…</div><div class="step__who">strong ETag · Cache-Control · 304 · Range</div></div></div>
+</div></div></section>"#,
+            max = esc(&human_size(state.config.max_asset as i64)),
+        )
+    } else {
+        String::new()
     };
 
     format!(
-        r##"<div class="console__head">
-  <h1>Eddy</h1>
-  <p class="sub">Self-hosted static-asset edge for {email}. Cached bytes are content-addressed and served from <code>/a/…</code> with strong ETags + <code>Cache-Control</code>; invalidation is exact.</p>
-</div>
-{banner}
+        r##"<header class="pagehead">
+  <div class="pagehead__titles"><h1>Static edge</h1><p class="pagehead__sub">{head_sub}</p></div>
+  <div class="pagehead__actions"><a class="btn btn-secondary" href="/">Refresh</a></div>
+</header>
 {stat_grid}
-<div class="eddy-layout">
-  <section class="card">
-    <div class="card__head"><h2>Cached assets</h2></div>
-    <div class="card__body--list">{asset_table}</div>
-  </section>
-  <div>
+{reveal_html}
+<div class="two-col two-col--rail-lg">
+  <div class="rail">
     <section class="card">
+      <div class="card__head"><h2>Cached assets</h2><span class="card__count">{count}</span></div>
+      {asset_table}
+    </section>
+    {first_steps}
+  </div>
+  <aside class="rail">
+    <section class="card" id="add">
       <div class="card__head"><h2>Add an asset</h2></div>
-      <div class="card__body">
-        <form method="post" action="/api/assets" enctype="multipart/form-data">
+      <div class="card__pad">
+        <form class="form-stack" method="post" action="/api/assets" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{csrf}">
-          <div class="field">
-            <label for="file">Upload a file</label>
-            <input type="file" id="file" name="file">
-          </div>
-          <div class="field">
-            <label for="origin_url">…or fetch from an origin URL</label>
-            <input type="text" id="origin_url" name="origin_url" placeholder="https://origin.example.com/app.css" autocomplete="off">
-          </div>
-          <div class="field">
-            <label for="path">Public path (optional)</label>
-            <input type="text" id="path" name="path" placeholder="css/app.css" autocomplete="off">
-          </div>
-          <div class="actions"><button class="btn btn-primary" type="submit">Cache asset</button></div>
+          <label class="drop" for="file">{ICON_UPLOAD_CLOUD}<span class="drop__title">Drop a file</span><span class="drop__limits">≤ {max} · any content type · sha256 addressed</span><input type="file" id="file" name="file"></label>
+          <span class="or">or fetch from an origin URL</span>
+          <div class="field"><label for="origin_url">Origin URL</label><input type="text" id="origin_url" name="origin_url" placeholder="https://origin.example.com/app.css" autocomplete="off"></div>
+          <div class="field"><label for="path">Public path (optional)</label><input type="text" id="path" name="path" placeholder="css/app.css" autocomplete="off"></div>
+          <button class="btn btn-primary" type="submit">{ICON_PLUS}Cache asset</button>
         </form>
       </div>
     </section>
     <section class="card">
-      <div class="card__head"><h2>Edge</h2></div>
-      <div class="card__body">
-        <p class="upstream-line"><span class="upstream-line__label">Storage</span> <code>{backend}</code></p>
-        <p class="muted">Signed URLs: {signing}.</p>
+      <div class="card__head"><h2>Edge</h2>{signed_pill}</div>
+      <div class="defs">
+        <div class="defs__row"><span class="defs__term">Storage</span><span class="defs__value mono">{backend}</span></div>
+        <div class="defs__row"><span class="defs__term">Cache-Control</span><span class="defs__value mono">public, max-age={max_age}</span></div>
+        <div class="defs__row"><span class="defs__term">Max asset</span><span class="defs__value">{max}</span></div>
+        <div class="defs__row"><span class="defs__term">Public base</span><span class="defs__value mono">{base}</span></div>
+        <div class="defs__row"><span class="defs__term">Signed URLs</span><span class="defs__value">{signed_defs}</span></div>
+        <div class="defs__row"><span class="defs__term">Conditional</span><span class="defs__value">ETag · 304 · Range</span></div>
+        <div class="defs__row"><span class="defs__term">Audit</span><span class="defs__value">eddy.asset.put · eddy.purge → Watchtower</span></div>
       </div>
     </section>
-  </div>
+    <section class="card" id="purge">
+      <div class="card__head"><h2>Purge</h2></div>
+      <div class="card__pad">
+        <form class="form-stack" method="post" action="/api/purge">
+          <input type="hidden" name="csrf_token" value="{csrf}">
+          <div class="field"><label for="purge-path">Path</label><input type="text" id="purge-path" name="path" placeholder="css/app.css" autocomplete="off"></div>
+          <div class="field"><label for="purge-hash">or sha256</label><input type="text" id="purge-hash" name="hash" placeholder="9f1c…" autocomplete="off"></div>
+          <button class="btn btn-danger-soft" type="submit">{ICON_TRASH}Purge exact</button>
+          <span class="drop__limits">blob GC when unreferenced</span>
+        </form>
+      </div>
+    </section>
+  </aside>
 </div>"##,
-        email = esc(&who.email),
-        banner = banner,
+        head_sub = head_sub,
         stat_grid = stat_grid,
+        reveal_html = reveal_html,
+        count = stats.count,
         asset_table = asset_table,
+        first_steps = first_steps,
         csrf = esc(csrf),
+        max = esc(&human_size(state.config.max_asset as i64)),
         backend = esc(state.blobs.backend()),
-        signing = signing,
+        max_age = state.config.cache_max_age,
+        base = esc(&state.config.public_base_url),
+        signed_pill = signed_pill,
+        signed_defs = signed_defs,
     )
 }
 
-fn render_banner(reveal: &Reveal<'_>) -> String {
+fn host_of(url: &str) -> String {
+    url.trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn plural(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
+}
+
+fn render_reveal(reveal: &Reveal<'_>) -> String {
     match reveal {
         Reveal::None => String::new(),
         Reveal::Url(url) => format!(
-            r##"<div class="token-reveal">
-  <p class="token-reveal__label">Asset cached — public URL:</p>
-  <code class="token-reveal__value"><a href="{url}">{url}</a></code>
-</div>"##,
+            r##"<section class="reveal reveal--asset" role="status">
+  <span class="reveal__label">Asset cached · public URL</span>
+  <div class="reveal__row"><input class="reveal__url" type="text" readonly value="{url}" spellcheck="false"><a class="btn btn-secondary" href="{url}">{ICON_EXTERNAL}Open</a></div>
+</section>"##,
             url = esc(url),
         ),
     }
@@ -517,11 +582,11 @@ fn render_banner(reveal: &Reveal<'_>) -> String {
 
 fn render_stats(stats: &CacheStats, backend: &str) -> String {
     format!(
-        r##"<div class="stat-grid">
-  <div class="stat"><div class="stat__num">{count}</div><div class="stat__label">Cached assets</div></div>
-  <div class="stat"><div class="stat__num">{size}</div><div class="stat__label">Total cache size</div></div>
-  <div class="stat"><div class="stat__num">{hits}</div><div class="stat__label">Edge hits</div></div>
-  <div class="stat"><div class="stat__num">{blobs}</div><div class="stat__label">Distinct blobs ({backend})</div></div>
+        r##"<div class="stats">
+  <div class="stat-tile stat-tile--accent"><div class="stat-tile__value">{count}</div><div class="stat-tile__name">cached assets</div></div>
+  <div class="stat-tile"><div class="stat-tile__value">{size}</div><div class="stat-tile__name">total cache size</div></div>
+  <div class="stat-tile"><div class="stat-tile__value">{hits}</div><div class="stat-tile__name">edge hits</div></div>
+  <div class="stat-tile"><div class="stat-tile__value">{blobs}</div><div class="stat-tile__name">distinct blobs · {backend}</div></div>
 </div>"##,
         count = stats.count,
         size = esc(&human_size(stats.total_bytes)),
@@ -531,9 +596,24 @@ fn render_stats(stats: &CacheStats, backend: &str) -> String {
     )
 }
 
+fn kind_icon(content_type: &str) -> &'static str {
+    if content_type.starts_with("image/") {
+        ICON_IMAGE
+    } else if content_type.contains("css")
+        || content_type.contains("javascript")
+        || content_type.contains("json")
+    {
+        ICON_FILE_CODE
+    } else {
+        ICON_FILE
+    }
+}
+
 fn render_assets(assets: &[Asset], csrf: &str, config: &Config) -> String {
     if assets.is_empty() {
-        return "<div class=\"log-empty\">No assets cached yet. Upload a file or fetch an origin URL to populate the edge.</div>".to_string();
+        return format!(
+            r##"<div class="card__pad"><div class="empty-tile">{ICON_UPLOAD_CLOUD}<span>No assets cached yet</span><a class="btn btn-secondary btn-sm" href="#add">Cache the first asset</a></div></div>"##
+        );
     }
     let rows = assets
         .iter()
@@ -541,24 +621,27 @@ fn render_assets(assets: &[Asset], csrf: &str, config: &Config) -> String {
             let url = public_url(config, &a.path);
             format!(
                 r##"<tr>
-  <td class="log__model"><a href="{url}">/a/{path}</a></td>
-  <td>{ctype}</td>
-  <td class="log__tokens">{size}</td>
-  <td class="log__tokens">{hits}</td>
-  <td class="log__hash"><code>{hash}</code></td>
-  <td>
+  <td class="c-kind"><span class="asset-kind">{icon}</span></td>
+  <td class="c-path"><a href="{url}">/a/{path}</a></td>
+  <td class="c-source">{ctype}</td>
+  <td class="c-seq">{size}</td>
+  <td class="c-seq">{hits}</td>
+  <td class="c-hash"><span class="hash hash--sm" title="{fullhash}">{hash}</span></td>
+  <td class="c-actions"><span class="row-actions">
     <form class="inline-form" method="post" action="/api/purge" onsubmit="return confirm('Purge this asset from the edge? This is immediate and exact.');">
       <input type="hidden" name="csrf_token" value="{csrf}">
       <input type="hidden" name="path" value="{path}">
-      <button class="btn btn-danger btn-sm" type="submit">Purge</button>
+      <button class="btn btn-danger-soft btn-sm" type="submit">Purge</button>
     </form>
-  </td>
+  </span></td>
 </tr>"##,
+                icon = kind_icon(&a.content_type),
                 url = esc(&url),
                 path = esc(&a.path),
                 ctype = esc(&a.content_type),
                 size = esc(&human_size(a.bytes)),
                 hits = a.hits,
+                fullhash = esc(&a.content_hash),
                 hash = esc(&short(&a.content_hash, 12)),
                 csrf = esc(csrf),
             )
@@ -566,10 +649,10 @@ fn render_assets(assets: &[Asset], csrf: &str, config: &Config) -> String {
         .collect::<Vec<_>>()
         .join("");
     format!(
-        r##"<table class="log-table">
-  <thead><tr><th>Path</th><th>Type</th><th>Size</th><th>Hits</th><th>Hash</th><th></th></tr></thead>
+        r##"<div class="table-scroll"><table class="timeline asset-table">
+  <thead><tr><th class="c-kind"></th><th>Path</th><th>Content type</th><th class="c-seq">Size</th><th class="c-seq">Hits</th><th>sha256</th><th></th></tr></thead>
   <tbody>{rows}</tbody>
-</table>"##,
+</table></div>"##,
         rows = rows,
     )
 }

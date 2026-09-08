@@ -1,35 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{{THEME_ATTR}}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="{{COLOR_SCHEME}}">
   <meta name="referrer" content="no-referrer">
-  <title>Clash subscription ready · Steadholme</title>
-  <style>{{CSS}}</style>
+  <title>Subscription ready · Verge</title>
+  <link rel="stylesheet" href="{{CSS_PATH}}">
 </head>
-<body class="page-console">
+<body class="page-v2">
 {{TOPBAR}}
-<main class="console">
-  <div class="console__head">
-    <h1>Subscription ready</h1>
-    <p class="sub">Copy this URL into Clash Verge within {{TTL_MINUTES}} minutes, or download the YAML now.</p>
-  </div>
+<main class="v2-page v2-narrow">
+  <header class="pagehead">
+    <div class="pagehead__titles">
+      <h1>Subscription ready</h1>
+      <p class="pagehead__sub">Clash Verge · valid {{TTL_MINUTES}} minutes · no-store</p>
+    </div>
+  </header>
 
-  <section class="card">
-    <div class="card__head"><h2>Temporary URL</h2></div>
-    <div class="card__body">
-      <div class="field">
-        <label for="subscription-url">Online subscription URL</label>
-        <input class="mono" id="subscription-url" type="text" readonly value="{{URL}}" spellcheck="false">
-      </div>
-      <div class="field field--submit">
-        <a class="btn btn-primary" href="{{URL}}">Download Clash profile</a>
-        <a class="btn btn-ghost" href="/profiles">Generate another</a>
-      </div>
-      <p class="note">Expires at Unix time <code>{{EXPIRES_AT}}</code>. This page and the profile response are marked <code>no-store</code>.</p>
+  <div class="secret secret--ttl" role="status">{{ICON_TIMER}}<div class="secret__text"><span class="secret__title">Valid {{TTL_MINUTES}} minutes · expires at Unix time {{EXPIRES_AT}}</span><span class="secret__detail">Treat the URL as a password while active · no-store</span></div></div>
+
+  <section class="reveal">
+    <label class="reveal__label" for="subscription-url">Online subscription URL</label>
+    <div class="reveal__row">
+      <input class="reveal__url" id="subscription-url" type="text" readonly value="{{URL}}" spellcheck="false">
+      <a class="btn btn-primary" href="{{URL}}">{{ICON_DOWNLOAD}}Download YAML</a>
     </div>
   </section>
+
+  <div class="defs card">
+    <div class="defs__row"><span class="defs__term">Expires at</span><span class="defs__value mono">{{EXPIRES_AT}}</span></div>
+    <div class="defs__row"><span class="defs__term">Cache</span><span class="defs__value">this page and the profile response are no-store</span></div>
+  </div>
+
+  <div class="tags"><a class="btn btn-secondary" href="/profiles">{{ICON_REFRESH}}Generate another</a></div>
+
+  <footer class="v2-foot">
+    <span class="v2-foot__lead">Steadholme Verge · mesh · edge · vpn</span>
+    <a href="https://status.w33d.xyz">Status</a>
+    <a href="https://w33d.xyz">All apps</a>
+  </footer>
 </main>
 </body>
 </html>

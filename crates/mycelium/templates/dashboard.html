@@ -1,108 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{{THEME_ATTR}}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>Mycelium · Steadholme</title>
-  <style>{{CSS}}</style>
+  <meta name="color-scheme" content="{{COLOR_SCHEME}}">
+  <title>Mesh control plane · Verge</title>
+  <link rel="stylesheet" href="{{CSS_PATH}}">
 </head>
-<body class="page-console">
+<body class="page-v2">
 {{TOPBAR}}
-<main class="console console--wide">
-  <div class="console__head">
-    <h1>Mesh control plane</h1>
-    <p class="sub">Enroll devices, manage peers + ACLs, and generate WireGuard configs. This is the coordination server — it does not run a kernel tunnel on this host.</p>
+<main class="v2-page">
+  <header class="pagehead">
+    <div class="pagehead__titles">
+      <h1>Mesh control plane</h1>
+      <p class="pagehead__sub">{{HEAD_SUB}}</p>
+    </div>
+    <div class="pagehead__actions"><a class="btn btn-primary" href="#enroll">{{ICON_PLUS}}Enroll device</a></div>
+  </header>
+
+  {{POSTURE_BANNER}}
+
+  <section class="tiles">
+    <div class="tile"><span class="tile__label">Mesh CIDR</span><span class="tile__value mono">{{CIDR}}</span></div>
+    <div class="tile"><span class="tile__label">Gateway · DNS</span><span class="tile__value mono">{{GATEWAY}}</span></div>
+    <div class="tile"><span class="tile__label">Devices active / total</span><span class="tile__value">{{DEVICE_COUNT}}</span></div>
+    <div class="tile"><span class="tile__label">Endpoint</span><span class="tile__value mono">{{ENDPOINT_DOMAIN}}</span></div>
+    <div class="tile"><span class="tile__label">ACL rules</span><span class="tile__value">{{ACL_COUNT}}</span></div>
+    <div class="tile tile--{{POSTURE_KIND}}"><span class="tile__label">Trust posture</span><span class="tile__value">{{POSTURE}}</span></div>
+  </section>
+
+  <div class="two-col two-col--rail">
+    <div class="rail">
+      <section class="card">
+        <div class="card__head"><h2>Devices</h2><span class="card__count">{{DEVICE_TOTAL}}</span></div>
+        <div class="table-scroll">
+          <table class="timeline dev-table">
+            <thead>
+              <tr><th class="c-icon"></th><th>Name</th><th>Mesh IP</th><th>Public key</th><th>Tags</th><th>Last seen</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {{DEVICE_ROWS}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="acl">
+        <div class="card__head"><h2>Access control</h2><span class="card__count">{{ACL_COUNT}}</span></div>
+        <div class="card__caption">{{POSTURE_CHIP}} <span>{{ACL_CAPTION}}</span></div>
+        <div class="table-scroll">
+          <table class="timeline acl-table">
+            <thead><tr><th>Source tag</th><th></th><th>Destination tag</th><th>Ports</th></tr></thead>
+            <tbody>
+              {{ACL_ROWS}}
+            </tbody>
+          </table>
+        </div>
+        <form class="add-row" method="post" action="/api/acls">
+          <input type="hidden" name="csrf_token" value="{{CSRF}}">
+          <div class="filterbar__field"><label for="src_tag">Source tag</label><input type="text" id="src_tag" name="src_tag" maxlength="64" placeholder="* or web"></div>
+          <span class="acl-arrow" aria-hidden="true">{{ICON_ARROW}}</span>
+          <div class="filterbar__field"><label for="dst_tag">Destination tag</label><input type="text" id="dst_tag" name="dst_tag" maxlength="64" placeholder="* or db"></div>
+          <div class="filterbar__field"><label for="ports">Ports</label><input type="text" id="ports" name="ports" maxlength="64" placeholder="* or 443"></div>
+          <button class="btn btn-secondary" type="submit">{{ICON_PLUS}}Add rule</button>
+        </form>
+      </section>
+    </div>
+
+    <aside class="rail">
+      <section class="card" id="enroll">
+        <div class="card__head"><h2>Enroll a device</h2></div>
+        <div class="card__pad">
+          <form class="form-stack" method="post" action="/api/devices">
+            <input type="hidden" name="csrf_token" value="{{CSRF}}">
+            <div class="field"><label for="name">Device name</label><input type="text" id="name" name="name" required maxlength="120" placeholder="alice-laptop"></div>
+            <div class="field"><label for="tags">Tags</label><input type="text" id="tags" name="tags" maxlength="200" placeholder="web prod"></div>
+            <button class="btn btn-primary" type="submit">{{ICON_KEY}}Generate keys &amp; enroll</button>
+          </form>
+          <div class="steps">
+            <div class="step step--done"><span class="step__mark" aria-hidden="true">{{ICON_CHECK}}</span><div><div class="step__label">Curve25519 keypair</div><div class="step__who">server-side · never stored</div></div></div>
+            <div class="step step--done"><span class="step__mark" aria-hidden="true">{{ICON_CHECK}}</span><div><div class="step__label">Mesh IP</div><div class="step__who">next free in {{CIDR}}</div></div></div>
+            <div class="step step--waiting"><span class="step__mark" aria-hidden="true">{{ICON_CLOCK}}</span><div><div class="step__label">wg0.conf shown once</div><div class="step__who">private key never stored</div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="vpn-profile-card" hidden>
+        <div class="card__head"><h2>VPN Profile</h2></div>
+        <div class="defs">
+          <div class="defs__row"><span class="defs__term">Permission</span><span class="defs__value">vpn.profile.subscribe · granted</span></div>
+          <div class="defs__row"><span class="defs__term">Link TTL</span><span class="defs__value">10 minutes</span></div>
+        </div>
+        <div class="card__pad"><a class="btn btn-secondary" href="/profiles">{{ICON_SHIELD}}Open VPN Profile</a></div>
+      </section>
+
+      <section class="card">
+        <div class="card__head"><h2>Mesh</h2></div>
+        <div class="defs">
+          <div class="defs__row"><span class="defs__term">CIDR</span><span class="defs__value mono">{{CIDR}}</span></div>
+          <div class="defs__row"><span class="defs__term">DNS</span><span class="defs__value mono">{{DNS}}</span></div>
+          <div class="defs__row"><span class="defs__term">Endpoint</span><span class="defs__value mono">{{ENDPOINT_DOMAIN}}</span></div>
+          <div class="defs__row"><span class="defs__term">Listen port</span><span class="defs__value mono">{{LISTEN_PORT}}</span></div>
+          <div class="defs__row"><span class="defs__term">Audit</span><span class="defs__value">mycelium.enroll · mycelium.revoke</span></div>
+        </div>
+      </section>
+    </aside>
   </div>
 
-  <section class="summary">
-    <div class="summary__item"><span class="summary__label">Mesh CIDR</span><span class="summary__value mono">{{CIDR}}</span></div>
-    <div class="summary__item"><span class="summary__label">Gateway / DNS</span><span class="summary__value mono">{{GATEWAY}} · {{DNS}}</span></div>
-    <div class="summary__item"><span class="summary__label">Devices (active/total)</span><span class="summary__value">{{DEVICE_COUNT}}</span></div>
-    <div class="summary__item"><span class="summary__label">Endpoint domain</span><span class="summary__value mono">{{ENDPOINT_DOMAIN}}</span></div>
-    <div class="summary__item"><span class="summary__label">ACL rules</span><span class="summary__value">{{ACL_COUNT}}</span></div>
-    <div class="summary__item"><span class="summary__label">Trust posture</span><span class="summary__value">{{POSTURE}}</span></div>
-  </section>
-
-  <section class="card" id="vpn-profile-card" hidden>
-    <div class="card__head"><h2>VPN Profile</h2></div>
-    <div class="card__body">
-      <p>Your account has the independent Clash profile permission. Generate a 10-minute online subscription without changing WireGuard devices.</p>
-      <a class="btn btn-primary" href="/profiles">Open VPN Profile</a>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="card__head">
-      <h2>Devices</h2>
-    </div>
-    <div class="card__body card__body--flush">
-      <table class="dtable">
-        <thead>
-          <tr>
-            <th>Name</th><th>Mesh IP</th><th>Public key</th><th>Tags</th><th>Last seen</th><th>Status</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{DEVICE_ROWS}}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="card__head"><h2>Enroll a device</h2></div>
-    <div class="card__body">
-      <form class="grid-form" method="post" action="/api/devices">
-        <input type="hidden" name="csrf_token" value="{{CSRF}}">
-        <div class="field">
-          <label for="name">Device name</label>
-          <input type="text" id="name" name="name" required maxlength="120" placeholder="e.g. alice-laptop">
-        </div>
-        <div class="field">
-          <label for="tags">Tags <span class="muted">(comma or space separated, optional)</span></label>
-          <input type="text" id="tags" name="tags" maxlength="200" placeholder="e.g. web prod">
-        </div>
-        <div class="field field--submit">
-          <button class="btn btn-primary" type="submit">Generate keys &amp; enroll</button>
-        </div>
-      </form>
-      <p class="note">The server generates a Curve25519 keypair and assigns the next free mesh IP. The private key is shown <strong>once</strong> on the next screen and never stored.</p>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="card__head"><h2>Access control</h2></div>
-    <div class="card__body card__body--flush">
-      <table class="dtable">
-        <thead><tr><th>Source tag</th><th>Destination tag</th><th>Ports</th></tr></thead>
-        <tbody>
-          {{ACL_ROWS}}
-        </tbody>
-      </table>
-    </div>
-    <div class="card__body">
-      <form class="grid-form" method="post" action="/api/acls">
-        <input type="hidden" name="csrf_token" value="{{CSRF}}">
-        <div class="field">
-          <label for="src_tag">Source tag</label>
-          <input type="text" id="src_tag" name="src_tag" maxlength="64" placeholder="* or web">
-        </div>
-        <div class="field">
-          <label for="dst_tag">Destination tag</label>
-          <input type="text" id="dst_tag" name="dst_tag" maxlength="64" placeholder="* or db">
-        </div>
-        <div class="field">
-          <label for="ports">Ports</label>
-          <input type="text" id="ports" name="ports" maxlength="64" placeholder="* or 443">
-        </div>
-        <div class="field field--submit">
-          <button class="btn btn-secondary" type="submit">Add rule</button>
-        </div>
-      </form>
-      <p class="note">A tag of <code>*</code> matches any device. With <strong>no</strong> rules the mesh is full-allow; adding the first rule switches it to default-deny (only matched links are configured as peers).</p>
-    </div>
-  </section>
+  <footer class="v2-foot">
+    <span class="v2-foot__lead">Steadholme Verge · mesh · edge · vpn</span>
+    <a href="https://status.w33d.xyz">Status</a>
+    <a href="https://w33d.xyz">All apps</a>
+  </footer>
 </main>
 <script src="/static/dashboard.js" defer></script>
 </body>

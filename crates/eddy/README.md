@@ -59,3 +59,11 @@ CARGO_BUILD_JOBS=2 cargo test
 ```
 
 The container HEALTHCHECK is `eddy healthcheck` (a dependency-free loopback `GET /healthz`).
+
+## 前端 v2（2026-09-08）
+
+Static edge 控制台按 Figma 文件 `BYTQUgcUowEbuwaFOLvk0Q`（Verge，moss accent）
+重做：套件栏（Mesh / Edge / VPN）、统计瓦片、缓存资产表、拖放上传卡、边缘定义
+卡、精确清除卡。样式在 `static/service.css`，与 Odyssey 基底层叠后由
+`/assets/eddy-20260908.css` 以不可变缓存提供；改样式时同步提升该路径里的日期
+（测试会断言路径）。

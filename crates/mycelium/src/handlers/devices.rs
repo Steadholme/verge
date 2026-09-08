@@ -19,7 +19,7 @@ use crate::audit::AuditEvent;
 use crate::auth;
 use crate::config::Config;
 use crate::error::AppError;
-use crate::handlers::{app_css, esc, fmt_date, topbar};
+use crate::handlers::{esc, fmt_date, shell, topbar, ICON_DOWNLOAD, ICON_LAPTOP, ICON_LOCK, ICON_UNLOCK};
 use crate::store::{self, Acl, Device};
 use crate::wg::{self, PeerView};
 use crate::{now_nanos, now_secs, AppState};
@@ -73,34 +73,67 @@ pub async fn dashboard(State(state): State<AppState>, headers: HeaderMap) -> Res
     let tmap = store::tag_map(state.store.all_tags().await);
 
     let enabled_count = devices.iter().filter(|d| d.enabled).count();
-    let posture = if acls.is_empty() {
-        "default-allow (no ACLs — full mesh)"
+    let (posture, posture_kind, posture_icon) = if acls.is_empty() {
+        ("full-allow", "allow", ICON_UNLOCK)
     } else {
-        "default-deny (ACL-gated)"
+        ("default-deny", "deny", ICON_LOCK)
+    };
+    let posture_chip = format!(
+        r#"<span class="posture posture--{posture_kind}">{posture_icon}{posture}</span>"#
+    );
+    let acl_caption = if acls.is_empty() {
+        "0 rules · every device peers with every device".to_string()
+    } else {
+        format!(
+            "{} · only matched links become peers · * matches any tag",
+            plural(acls.len(), "rule", "rules")
+        )
+    };
+    let posture_banner = if acls.is_empty() && !devices.is_empty() {
+        r##"<div class="banner banner--warn" role="status"><span class="banner__msg">Mesh is full-allow · 0 ACL rules · the first rule switches every device to default-deny</span><a class="btn btn-secondary btn-sm" href="#acl">Add rule</a></div>"##.to_string()
+    } else {
+        String::new()
+    };
+    let head_sub = format!(
+        "{} · {} active · {} · {posture}",
+        plural(devices.len(), "device", "devices"),
+        enabled_count,
+        plural(acls.len(), "ACL rule", "ACL rules"),
+    );
+    let endpoint = if state.config.endpoint_domain.is_empty() {
+        "—".to_string()
+    } else {
+        format!("{}:{}", state.config.endpoint_domain, state.config.listen_port)
     };
 
     let device_rows = render_device_rows(&devices, &tmap, &csrf);
     let acl_rows = render_acl_rows(&acls);
 
-    let page = DASHBOARD_HTML
-        .replace("{{CSS}}", app_css())
+    let page = shell(DASHBOARD_HTML, &headers)
         .replace("{{TOPBAR}}", &topbar("Mesh control plane", &email))
+        .replace("{{HEAD_SUB}}", &esc(&head_sub))
+        .replace("{{POSTURE_BANNER}}", &posture_banner)
         .replace("{{CIDR}}", &esc(&state.config.cidr.to_text()))
         .replace("{{DNS}}", &esc(&state.config.dns))
-        .replace("{{GATEWAY}}", &esc(&state.config.cidr.gateway_string()))
         .replace(
-            "{{ENDPOINT_DOMAIN}}",
-            &esc(if state.config.endpoint_domain.is_empty() {
-                "(none)"
-            } else {
-                &state.config.endpoint_domain
-            }),
+            "{{GATEWAY}}",
+            &esc(&format!(
+                "{} · {}",
+                state.config.cidr.gateway_string(),
+                state.config.dns
+            )),
         )
+        .replace("{{ENDPOINT_DOMAIN}}", &esc(&endpoint))
+        .replace("{{LISTEN_PORT}}", &state.config.listen_port.to_string())
         .replace(
             "{{DEVICE_COUNT}}",
             &format!("{enabled_count} / {}", devices.len()),
         )
+        .replace("{{DEVICE_TOTAL}}", &devices.len().to_string())
         .replace("{{ACL_COUNT}}", &acls.len().to_string())
+        .replace("{{ACL_CAPTION}}", &esc(&acl_caption))
+        .replace("{{POSTURE_KIND}}", posture_kind)
+        .replace("{{POSTURE_CHIP}}", &posture_chip)
         .replace("{{POSTURE}}", posture)
         .replace("{{CSRF}}", &esc(&csrf))
         .replace("{{DEVICE_ROWS}}", &device_rows)
@@ -192,14 +225,17 @@ pub async fn enroll(
     ));
     tracing::info!(device = %device.id, ip = %device.mesh_ip, "device enrolled");
 
-    let page = ENROLLED_HTML
-        .replace("{{CSS}}", app_css())
+    let page = shell(ENROLLED_HTML, &headers)
         .replace("{{TOPBAR}}", &topbar("Device enrolled", &email))
         .replace("{{NAME}}", &esc(&device.name))
+        .replace("{{NAME_SLUG}}", &esc(&wg::slugify(&device.name)))
+        .replace("{{DEVICE_ID}}", &esc(&device.id))
         .replace("{{MESH_IP}}", &esc(&device.mesh_ip))
         .replace("{{PUBKEY}}", &esc(&device.public_key))
         .replace("{{PEER_COUNT}}", &peers.len().to_string())
-        .replace("{{CONF}}", &esc(&conf));
+        .replace("{{ENROLLED_AT}}", &esc(&fmt_date(device.enrolled_at)))
+        .replace("{{CONF_DATA_URL}}", &conf_data_url(&conf))
+        .replace("{{CONF_HTML}}", &conf_html(&conf));
 
     Ok(no_store(Html(page).into_response()))
 }
@@ -370,20 +406,22 @@ fn render_device_rows(
     csrf: &str,
 ) -> String {
     if devices.is_empty() {
-        return r#"<tr><td colspan="7" class="dtable__empty">No devices enrolled yet. Enroll your first node below.</td></tr>"#.to_string();
+        return r#"<tr><td colspan="8" class="empty"><div class="empty-tile">"#.to_string()
+            + ICON_LAPTOP
+            + r##"<span>No devices enrolled yet</span><a class="btn btn-secondary btn-sm" href="#enroll">Enroll a device</a></div></td></tr>"##;
     }
     let empty: Vec<String> = Vec::new();
     let mut out = String::new();
     for d in devices {
         let dtags = tags.get(&d.id).unwrap_or(&empty);
         let tag_html = if dtags.is_empty() {
-            r#"<span class="muted">—</span>"#.to_string()
+            r#"<span class="c-any">—</span>"#.to_string()
         } else {
             dtags
                 .iter()
                 .map(|t| format!(r#"<span class="tag">{}</span>"#, esc(t)))
                 .collect::<Vec<_>>()
-                .join(" ")
+                .join("")
         };
         let status = if d.enabled {
             r#"<span class="badge badge-ok">Active</span>"#
@@ -394,7 +432,7 @@ fn render_device_rows(
             format!(
                 r#"<form class="inline-form" method="post" action="/api/devices/{id}/revoke" onsubmit="return confirm('Revoke this device? It will be removed from every peer config.');">
   <input type="hidden" name="csrf_token" value="{csrf}">
-  <button class="btn btn-danger btn-sm" type="submit">Revoke</button>
+  <button class="btn btn-danger-soft btn-sm" type="submit">Revoke</button>
 </form>"#,
                 id = esc(&d.id),
                 csrf = esc(csrf),
@@ -403,15 +441,18 @@ fn render_device_rows(
             String::new()
         };
         out.push_str(&format!(
-            r#"<tr>
-  <td><span class="dev-name">{name}</span></td>
-  <td><code class="mono">{ip}</code></td>
-  <td><code class="mono" title="{pubkey}">{fp}</code></td>
-  <td>{tags}</td>
-  <td class="muted">{seen}</td>
+            r#"<tr{row}>
+  <td class="c-icon"><span class="asset-kind">{icon}</span></td>
+  <td class="c-name">{name}</td>
+  <td><span class="mono-accent">{ip}</span></td>
+  <td class="c-fp"><span class="fp" title="{pubkey}">{fp}</span></td>
+  <td><span class="tags">{tags}</span></td>
+  <td class="c-source">{seen}</td>
   <td>{status}</td>
-  <td class="dtable__actions"><a class="btn btn-secondary btn-sm" href="/api/config/{id}">Config</a>{action}</td>
+  <td class="c-actions"><span class="row-actions"><a class="btn btn-secondary btn-sm btn-icon" href="/api/config/{id}" title="Download peers config">{download}</a>{action}</span></td>
 </tr>"#,
+            row = if d.enabled { "" } else { r#" class="is-revoked""# },
+            icon = ICON_LAPTOP,
             name = esc(&d.name),
             ip = esc(&d.mesh_ip),
             pubkey = esc(&d.public_key),
@@ -420,6 +461,7 @@ fn render_device_rows(
             seen = esc(&fmt_date(d.last_seen)),
             status = status,
             id = esc(&d.id),
+            download = ICON_DOWNLOAD,
             action = action,
         ));
     }
@@ -428,22 +470,70 @@ fn render_device_rows(
 
 fn render_acl_rows(acls: &[Acl]) -> String {
     if acls.is_empty() {
-        return r#"<tr><td colspan="3" class="dtable__empty">No ACL rules — the mesh is currently full-allow. Add a rule to switch to default-deny.</td></tr>"#.to_string();
+        return r#"<tr><td colspan="4" class="empty"><div class="empty-tile">"#.to_string()
+            + ICON_UNLOCK
+            + r#"<span>No ACL rules · mesh is full-allow</span><span class="drop__limits">The first rule switches the mesh to default-deny</span></div></td></tr>"#;
     }
     let mut out = String::new();
     for a in acls {
         out.push_str(&format!(
             r#"<tr>
   <td><span class="tag">{src}</span></td>
+  <td class="acl-arrow">{arrow}</td>
   <td><span class="tag">{dst}</span></td>
-  <td><code class="mono">{ports}</code></td>
+  <td><span class="mono-accent">{ports}</span></td>
 </tr>"#,
             src = esc(&a.src_tag),
+            arrow = crate::handlers::ICON_ARROW,
             dst = esc(&a.dst_tag),
             ports = esc(&a.ports),
         ));
     }
     out
+}
+
+/// Colour the wg0.conf lines by kind (section header · comment · secret · key) while keeping each
+/// line's text contiguous, so `Address = 10.77.0.2/32` stays greppable/copyable.
+fn conf_html(conf: &str) -> String {
+    conf.lines()
+        .map(|line| {
+            let kind = if line.starts_with('[') {
+                "section"
+            } else if line.starts_with('#') {
+                "comment"
+            } else if line.starts_with("PrivateKey") {
+                "secret"
+            } else if line.is_empty() {
+                "blank"
+            } else {
+                "key"
+            };
+            format!(
+                "<span class=\"wg-line wg-line--{kind}\">{}</span>",
+                esc(line)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `data:` URL carrying the one-time config so the browser can save it as `wg0.conf` without a
+/// server round-trip (the private key is never re-served).
+fn conf_data_url(conf: &str) -> String {
+    let mut out = String::from("data:text/plain;charset=utf-8,");
+    for b in conf.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+fn plural(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 // ---------------------------------------------------------------------------

@@ -1,33 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{{THEME_ATTR}}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>{{STATUS}} · Eddy · Steadholme</title>
-  <style>{{CSS}}</style>
+  <meta name="color-scheme" content="{{COLOR_SCHEME}}">
+  <title>{{STATUS}} · Verge</title>
+  <link rel="stylesheet" href="{{CSS_PATH}}">
 </head>
-<body class="page-console">
-  <header class="topbar">
-    <div class="topbar__inner">
-      <a class="brand" href="/" aria-label="Steadholme Eddy">
-        <span class="brand__glyph" aria-hidden="true">{{SHIELD}}</span>
-        <span class="brand__word">Steadholme</span>
-        <span class="brand__product">Eddy</span>
-      </a>
-      <div class="topbar__right">{{USERBOX}}</div>
+<body class="page-v2">
+  {{TOPBAR}}
+  <main class="v2-page v2-narrow">
+    <div class="status-wrap">
+      <section class="status-tile">
+        <div class="status-tile__code">{{STATUS}}</div>
+        <h1 class="status-tile__heading">{{HEADING}}</h1>
+        <p class="status-tile__detail">{{MESSAGE}}</p>
+        <div><a class="btn btn-secondary" href="/">Back to the edge console</a></div>
+      </section>
     </div>
-  </header>
-
-  <main class="console">
-    <section class="card card--message">
-      <div class="card__body">
-        <div class="status-code">{{STATUS}}</div>
-        <h1 class="message-heading">{{HEADING}}</h1>
-        <p class="message-body">{{MESSAGE}}</p>
-        <a class="btn btn-primary" href="/">Back to Eddy</a>
-      </div>
-    </section>
   </main>
 </body>
 </html>

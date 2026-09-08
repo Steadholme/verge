@@ -80,6 +80,7 @@ pub fn app(state: AppState) -> Router {
     // they are NOT identity-gated.
     let public = Router::new()
         .route("/healthz", get(handlers::health::healthz))
+        .route(handlers::APP_CSS_PATH, get(handlers::app_css_asset))
         .route("/a/{*path}", get(handlers::serve::serve));
     console
         .merge(public)
